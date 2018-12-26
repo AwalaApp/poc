@@ -9,13 +9,8 @@ const fsStat = promisify(fs.stat);
 
 const _SOCKET_PATH = '/tmp/relayer-gateway.sock';
 const _OUTGOING_CARGOES_PATH = __dirname + '/sample-cargoes';
-const _RELAYER_ID = 'theRelayer';
 
 const client = net.createConnection(_SOCKET_PATH, async function () {
-    // Authentication (air quotes)
-    client.write('W'); // Message tag ("W" for "who")
-    client.write(serializeVarchar(_RELAYER_ID));
-
     const cargoFileNames = await promisify(fs.readdir)(_OUTGOING_CARGOES_PATH);
     for (let cargoFileName of cargoFileNames) {
         await unloadCargo(`${_OUTGOING_CARGOES_PATH}/${cargoFileName}`, client);

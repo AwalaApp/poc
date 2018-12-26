@@ -4,7 +4,6 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const net = require('net');
-const {Authentication, Cargo} = require('../relay/messages');
 const {RelayerStream} = require('../relay/relayer-transformer');
 
 const _SOCKET_PATH = '/tmp/relayer-gateway.sock';
@@ -12,15 +11,10 @@ const _INCOMING_CARGOES_DIR = '/tmp/incoming-cargoes';
 
 const server = net.createServer(function (client) {
     const relayerClient = new RelayerStream(client);
-    relayerClient.on('data', function (data) {
-        if (data instanceof Authentication) {
-        } else if (data instanceof Cargo) {
-            const cargoFileName = crypto.randomBytes(16).toString("hex") + '.cargo';
-            const cargoFileStream = fs.createWriteStream(`${_INCOMING_CARGOES_DIR}/${cargoFileName}`);
-            data.stream.pipe(cargoFileStream);
-        } else {
-            console.log('Got', data);
-        }
+    relayerClient.on('data', function (cargo) {
+        const cargoFileName = crypto.randomBytes(16).toString("hex") + '.cargo';
+        const cargoFileStream = fs.createWriteStream(`${_INCOMING_CARGOES_DIR}/${cargoFileName}`);
+        cargo.stream.pipe(cargoFileStream);
     });
     relayerClient.init();
 });

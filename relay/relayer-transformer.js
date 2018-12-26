@@ -1,7 +1,7 @@
 'use strict';
 // Remember this is a proof of concept! The code below is ugly and has no tests.
 
-const {Authentication, Cargo} = require('./messages');
+const {Cargo} = require('./messages');
 const {deserializeVarbigint} = require('../utils/primitives');
 const {PassThrough, Readable} = require('stream');
 
@@ -11,7 +11,6 @@ class RelayerStream extends Readable {
 
         this._socket = socket;
 
-        this._alreadyAuthenticated = false;
         this._partialMessage = null;
 
         this._buffer = Buffer.allocUnsafe(0);
@@ -43,52 +42,13 @@ class RelayerStream extends Readable {
     _processData() {
         this._canProcessData = true;
         while (this._canProcessData) {
-            let message;
-            if (this._alreadyAuthenticated) {
-                message = this._getCargo();
-            } else {
-                message = this._getAuthn();
-            }
-
+            const message = this._getCargo();
             if (message) {
                 if (!this.push(message)) {
                     this._socket.pause();
                 }
             }
         }
-    }
-
-    _getAuthn() {
-        if (!this._partialMessage && !this._hasOctets(2)) {
-            return;
-        }
-
-        let lengthPrefix;
-        if (this._partialMessage) {
-            lengthPrefix = this._partialMessage.relayerIdLength;
-        } else {
-            const authnHeader = this._readOctets(2);
-            const tag = String.fromCharCode(authnHeader[0]);
-            if (tag !== 'W') {
-                this.emit('error', new Error(`Expected 'W' tag, got ${tag}`));
-                this.push(null);
-                return;
-            }
-
-            lengthPrefix = authnHeader[1];
-        }
-
-        if (!this._hasOctets(lengthPrefix)) {
-            this._partialMessage = {relayerIdLength: lengthPrefix};
-            return;
-        }
-
-        const relayerIdSerialized = this._readOctets(lengthPrefix);
-        const authentication = new Authentication(relayerIdSerialized.toString());
-
-        this._alreadyAuthenticated = true;
-        this._partialMessage = null;
-        return authentication;
     }
 
     _getCargo() {
