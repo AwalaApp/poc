@@ -16,7 +16,8 @@ const client = net.createConnection(_SOCKET_PATH, async function () {
         await unloadCargo(`${_OUTGOING_CARGOES_PATH}/${cargoFileName}`, client);
     }
 
-    client.end();
+    // Allow some time to receive acknowledgements
+    setTimeout(() => client.end(), 2000);
 });
 
 async function unloadCargo(cargoFilePath, client) {
@@ -45,8 +46,7 @@ function pipeFileToSocket(filePath, targetSocket) {
 }
 
 client.on('data', (data) => {
-    console.log(data.toString());
-    client.end();
+    console.log('Server says', data.toString());
 });
 
 client.on('error', (err) => {

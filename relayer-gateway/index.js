@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const net = require('net');
+const {serializeVarchar} = require('../utils/primitives');
 const {RelayerStream} = require('../relay/relayer-transformer');
 
 const _SOCKET_PATH = '/tmp/relayer-gateway.sock';
@@ -14,6 +15,14 @@ const server = net.createServer(function (client) {
     relayerClient.on('data', function (cargo) {
         const cargoFileName = crypto.randomBytes(16).toString("hex") + '.cargo';
         const cargoFileStream = fs.createWriteStream(`${_INCOMING_CARGOES_DIR}/${cargoFileName}`);
+        cargoFileStream.on('finish', () => {
+            // This should call fdatasync() in real life
+
+            if (!client.destroyed) {
+                client.write('c');
+                client.write(serializeVarchar(cargo.id));
+            }
+        });
         cargo.stream.pipe(cargoFileStream);
     });
     relayerClient.init();
