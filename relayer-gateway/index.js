@@ -1,5 +1,5 @@
 'use strict';
-// Remember this is a proof of concept! The code below is ugly and has no tests.
+// This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const crypto = require('crypto');
 const fs = require('fs');
