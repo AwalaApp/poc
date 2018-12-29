@@ -1,8 +1,8 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-const {Cargo} = require('./messages');
-const {deserializeVarbigint} = require('../utils/primitives');
+const {Cargo} = require('./_messages');
+const {deserializeVarbigint} = require('./_primitives');
 const {PassThrough, Readable} = require('stream');
 
 class RelayerStream extends Readable {

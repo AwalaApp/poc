@@ -3,7 +3,7 @@
 
 const fs = require('fs');
 const net = require('net');
-const {serializeVarbigint, serializeVarchar} = require('../utils/primitives');
+const {serializeVarbigint, serializeVarchar} = require('./_primitives');
 const {promisify} = require('util');
 const fsStat = promisify(fs.stat);
 

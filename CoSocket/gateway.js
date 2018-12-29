@@ -4,8 +4,8 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const net = require('net');
-const {serializeVarchar} = require('../utils/primitives');
-const {RelayerStream} = require('../relay/relayer-transformer');
+const {serializeVarchar} = require('./_primitives');
+const {RelayerStream} = require('./_stream');
 
 const _SOCKET_PATH = '/tmp/relayer-gateway.sock';
 const _INCOMING_CARGOES_DIR = '/tmp/incoming-cargoes';
