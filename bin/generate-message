@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+'use strict';
+// This is a proof of concept. The code below is ugly, inefficient and has no tests.
+
+const fs = require('fs');
+const yargs = require('yargs');
+const {CARGO_SERIALIZER, PARCEL_SERIALIZER} = require('../messages/serialization');
+const {Parcel} = require('../messages');
+
+const SERIALIZER_BY_TYPE = {
+    cargo: CARGO_SERIALIZER,
+    parcel: PARCEL_SERIALIZER,
+};
+
+const argv = yargs
+    .option('type', {
+        choices: Object.keys(SERIALIZER_BY_TYPE),
+        demandOption: true,
+        requiresArg: true,
+        description: 'The type of message (parcel or cargo)'
+    })
+    .option('recipient', {
+        demandOption: true,
+        requiresArg: true,
+        description: "The recipient's address",
+    })
+    .option('cert', {
+        demandOption: true,
+        requiresArg: true,
+        description: "The sender's X.509 certificate (chain), DER-encoded",
+    })
+    .help()
+    .argv;
+
+const cert = fs.readFileSync(argv.cert);
+const parcel = new Parcel(
+    argv.recipient,
+    cert,
+    fs.readFileSync(process.stdin.fd),
+);
+
+process.stdout.write(PARCEL_SERIALIZER.serialize(parcel));

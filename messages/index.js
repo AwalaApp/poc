@@ -7,10 +7,10 @@
  * In real life, this would be a stream wrapping `payload`.
  */
 class Message {
-    constructor(recipient, labels, payload, signature) {
+    constructor(recipient, senderCert, payload, signature) {
         this.recipient = recipient;
-        this.labels = labels || {};
         this.payload = payload;
+        this.senderCert = senderCert;
         this.signature = signature;
     }
 }
