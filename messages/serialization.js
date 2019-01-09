@@ -1,9 +1,13 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-const crypto = require('crypto');
-const {Cargo, Parcel} = require('./index');
 const BParser = require('binary-parser').Parser;
+const crypto = require('crypto');
+const openssl = require('openssl-wrapper');
+const {Cargo, Parcel} = require('./index');
+const {promisify} = require('util');
+
+const opensslExec = promisify(openssl.exec);
 
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer
 const MAX_PAYLOAD_SIZE = (2 ** 32) - 1; // 32-bit, unsigned integer
@@ -46,10 +50,11 @@ class MessageV1Serializer {
 
     /**
      * @param message
+     * @param {string} recipientCertPath Path to the recipient's X.509. Should be a buffer in "real life".
      * @param {string} signatureHashAlgo
      * @returns {Buffer}
      */
-    serialize(message, signatureHashAlgo='sha256') {
+    async serialize(message, recipientCertPath, signatureHashAlgo = 'sha256') {
         const formatSignature = Buffer.allocUnsafe(10);
         formatSignature.write('Relaynet');
         formatSignature.writeUInt8(this._signature, 8);
@@ -59,7 +64,7 @@ class MessageV1Serializer {
             this._serializeSignatureHashAlgo(signatureHashAlgo),
             this._serializeRecipient(message),
             this._serializeSenderCert(message.senderCert),
-            this._serializePayload(message.payload),
+            await this._serializePayload(message.payload, recipientCertPath),
         ]);
 
         const signature = this._serializeSignature(partialMessageSerialization, signatureHashAlgo);
@@ -90,15 +95,20 @@ class MessageV1Serializer {
         return Buffer.concat([lengthPrefix, cert]);
     }
 
-    _serializePayload(payloadRaw) {
-        // TODO: Encrypt when requested
-        const length = payloadRaw.length;
+    async _serializePayload(payloadRaw, recipientCertPath) {
+        // TODO: Support "data" type (i.e., unencrypted payload)
+        const ciphertext = await opensslExec('cms.encrypt', payloadRaw, {
+            binary: true,
+            outform: 'DER',
+            [recipientCertPath]: false,
+        });
+        const length = ciphertext.length;
         if (MAX_PAYLOAD_SIZE < length) {
             throw new Error('Payload exceeds maximum length of 32-bit');
         }
         const lengthPrefix = Buffer.allocUnsafe(4);
         lengthPrefix.writeUInt32LE(length, 0);
-        return Buffer.concat([lengthPrefix, payloadRaw], length + 4);
+        return Buffer.concat([lengthPrefix, ciphertext], length + 4);
     }
 
     _serializeSignature(partialMessageSerialization, signatureHashAlgo) {

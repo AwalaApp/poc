@@ -12,6 +12,16 @@ const SERIALIZER_BY_TYPE = {
     parcel: PARCEL_SERIALIZER,
 };
 
+async function main(argv) {
+    const parcel = new Parcel(
+        argv.recipient,
+        fs.readFileSync(argv.senderCert),
+        fs.readFileSync(process.stdin.fd),
+    );
+
+    process.stdout.write(await PARCEL_SERIALIZER.serialize(parcel, argv.recipientCert));
+}
+
 const argv = yargs
     .option('type', {
         choices: Object.keys(SERIALIZER_BY_TYPE),
@@ -24,19 +34,17 @@ const argv = yargs
         requiresArg: true,
         description: "The recipient's address",
     })
-    .option('cert', {
+    .option('recipient-cert', {
         demandOption: true,
         requiresArg: true,
-        description: "The sender's X.509 certificate (chain), DER-encoded",
+        description: "The recipient's X.509 certificate (chain), DER-encoded",
+    })
+    .option('sender-cert', {
+        demandOption: true,
+        requiresArg: true,
+        description: "The sender's X.509 certificate (chain), PEM-encoded",
     })
     .help()
     .argv;
 
-const cert = fs.readFileSync(argv.cert);
-const parcel = new Parcel(
-    argv.recipient,
-    cert,
-    fs.readFileSync(process.stdin.fd),
-);
-
-process.stdout.write(PARCEL_SERIALIZER.serialize(parcel));
+(async () => await main(argv))();

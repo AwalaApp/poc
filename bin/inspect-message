@@ -2,33 +2,51 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
+const assert = require('assert').strict;
 const fs = require('fs');
 const yargs = require('yargs');
 const {CARGO_SERIALIZER, PARCEL_SERIALIZER} = require('../messages/serialization');
 
-const SERIALIZER_BY_TYPE = {
-    cargo: CARGO_SERIALIZER,
-    parcel: PARCEL_SERIALIZER,
+const SERIALIZER_BY_TAG = {
+    C: CARGO_SERIALIZER,
+    P: PARCEL_SERIALIZER,
 };
 
 function configureCli(builder) {
     builder
-        .option('type', {
-            choices: Object.keys(SERIALIZER_BY_TYPE),
-            demandOption: true,
+        .option('recipient-key', {
             requiresArg: true,
-            description: 'The type of message (parcel or cargo)'
+            description: "The path to the recipient's private key, to decrypt payload",
+            normalize: true,
+        })
+        .option('decode-payload', {
+            description: "Whether to UTF-8 decode the payload after decryption",
+            boolean: true,
+            default: false,
         })
         .normalize('messagePath')
         .requiresArg('messagePath')
     ;
 }
 
-function main(argv) {
+async function main(argv) {
     const messageRef = (argv.messagePath === '-') ? fs.openSync('/dev/stdin', 'rs') : argv.messagePath;
     const messageRaw = fs.readFileSync(messageRef);
-    const serializer = SERIALIZER_BY_TYPE[argv.type];
-    console.log(serializer.deserialize(messageRaw));
+
+    const fileSignature = messageRaw.slice(0, 9).toString();
+    assert(fileSignature.startsWith('Relaynet'), 'Message must be a Relaynet message');
+    const fileTag = fileSignature[8];
+    const serializer = SERIALIZER_BY_TAG[fileTag];
+    assert(serializer, `Message tag must be either parcel or cargo, not "${fileTag}"`);
+
+    const message = serializer.deserialize(messageRaw);
+    console.log(message);
+
+    if (argv.recipientKey) {
+        const payloadDecrypted = await message.decryptPayload(argv.recipientKey);
+        const payloadOutput = (argv.decodePayload) ? payloadDecrypted.toString('utf-8') : payloadDecrypted;
+        console.log('Payload decrypted:', payloadOutput);
+    }
 }
 
 yargs

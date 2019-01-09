@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Generate certificates for a private endpoint/gateway (one with an opaque address)
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+ADDRESS_SCHEME="$1"
+CERT_PATH="$2"
+KEY_PATH="$3"
+
+openssl ecparam -name prime256v1 -genkey -noout -out "${KEY_PATH}"
+PUBLIC_KEY_FINGERPRINT="$(openssl ec -in "${KEY_PATH}" -pubout -outform DER 2>/dev/null | sha256sum --binary | awk '{ print $1 }')"
+
+ADDRESS="${ADDRESS_SCHEME}:0${PUBLIC_KEY_FINGERPRINT:0:32}"
+
+openssl req \
+    -new \
+    -x509 \
+    -days 365 \
+    -nodes \
+    -config <(cat <<EOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = SAN
+prompt = no
+
+[req_distinguished_name]
+C = GB
+
+[SAN]
+subjectAltName = URI:${ADDRESS}
+EOF
+) \
+    -key "${KEY_PATH}" \
+    -outform der \
+    -out "${CERT_PATH}"
+
+echo "Generated certificate with address ${ADDRESS}"

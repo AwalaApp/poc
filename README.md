@@ -42,13 +42,14 @@ Similar to the example above, but using an adapter run by a third party (so not 
 
 ### Generating messages
 
-The following will generate a parcel for the endpoint `rne:targetEndpointAddr`, from the endpoint whose X.509 certificate (chain) is available at `samples/x509_cert.der`. The payload will be the contents of `samples/payload.txt`.
+The following will generate a parcel for the endpoint `rne:targetEndpointAddr`, from the endpoint whose X.509 certificate (chain) is available at `samples/alice_cert.der`. The payload will be the contents of `samples/payload.txt`.
 
 ```bash
 ./bin/generate-message \
     --type parcel \
     --recipient rne:targetEndpointAddr \
-    --cert samples/x509_cert.der \
+    --recipient-cert samples/bob_cert.pem \
+    --sender-cert samples/alice_cert.der \
     < samples/payload.txt \
     > /tmp/output.parcel
 ```
@@ -57,8 +58,11 @@ The parcel would've been saved to `/tmp/output.parcel`.
 
 ### Inspecting messages
 
-Example with a parcel:
+Example with the parcel generated above:
 
 ```bash
-./bin/inspect-message --type parcel sample/sample.parcel
+./bin/inspect-message \
+    --recipient-key samples/bob_key.pem \
+    --decode-payload \
+    /tmp/output.parcel
 ```
