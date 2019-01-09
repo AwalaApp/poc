@@ -47,7 +47,7 @@ The following will generate a parcel for the endpoint `rne:targetEndpointAddr`, 
 ```bash
 ./bin/generate-message \
     --type parcel \
-    --recipient rne:targetEndpointAddr \
+    --recipient rneo:targetEndpointAddr \
     --recipient-cert samples/bob_cert.pem \
     --sender-cert samples/alice_cert.pem \
     --sender-key samples/alice_key.pem \
