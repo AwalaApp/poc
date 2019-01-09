@@ -5,7 +5,6 @@
 const fs = require('fs');
 const yargs = require('yargs');
 const {CARGO_SERIALIZER, PARCEL_SERIALIZER} = require('../messages/serialization');
-const {Parcel} = require('../messages');
 
 const SERIALIZER_BY_TYPE = {
     cargo: CARGO_SERIALIZER,
@@ -13,15 +12,11 @@ const SERIALIZER_BY_TYPE = {
 };
 
 async function main(argv) {
-    const parcel = new Parcel(
-        argv.recipient,
-        fs.readFileSync(argv.senderCert),
+    const serializer = SERIALIZER_BY_TYPE[argv.type];
+    process.stdout.write(await serializer.serialize(
         fs.readFileSync(process.stdin.fd),
-    );
-
-    process.stdout.write(await PARCEL_SERIALIZER.serialize(
-        parcel,
         argv.recipientCert,
+        fs.readFileSync(argv.senderCert),
         argv.senderKey,
         argv.signHashAlgo,
     ));

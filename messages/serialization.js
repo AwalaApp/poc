@@ -3,7 +3,9 @@
 
 const BParser = require('binary-parser').Parser;
 const cms = require('./_cms');
+const fs = require('fs');
 const {Cargo, Parcel} = require('./index');
+const {getAddressFromCert} = require('./utils');
 const {pemCertToDer} = require('./_asn1_utils');
 
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer
@@ -46,13 +48,14 @@ class MessageV1Serializer {
     }
 
     /**
-     * @param message
+     * @param payload
      * @param {string} recipientCertPath Path to the recipient's X.509. Should be a buffer in "real life".
+     * @param {string} senderCert
      * @param {string} senderKeyPath
      * @param {string} signatureHashAlgo
      * @returns {Buffer}
      */
-    async serialize(message, recipientCertPath, senderKeyPath, signatureHashAlgo) {
+    async serialize(payload, recipientCertPath, senderCert, senderKeyPath, signatureHashAlgo) {
         const formatSignature = Buffer.allocUnsafe(10);
         formatSignature.write('Relaynet');
         formatSignature.writeUInt8(this._signature, 8);
@@ -60,25 +63,27 @@ class MessageV1Serializer {
         const partialMessageSerialization = Buffer.concat([
             formatSignature,
             this._serializeSignatureHashAlgo(signatureHashAlgo),
-            this._serializeRecipient(message),
-            this._serializeSenderCert(message.senderCert),
-            await this._serializePayload(message.payload, recipientCertPath),
+            this._serializeRecipient(recipientCertPath),
+            this._serializeSenderCert(senderCert),
+            await this._serializePayload(payload, recipientCertPath),
         ]);
 
         const signature = await this._serializeSignature(
             partialMessageSerialization,
             senderKeyPath,
-            message.senderCert,
+            senderCert,
             signatureHashAlgo,
         );
         return Buffer.concat([partialMessageSerialization, signature]);
     }
 
-    _serializeRecipient(message) {
-        const recipient = Buffer.allocUnsafe(message.recipient.length + 2);
-        recipient.writeUInt16LE(message.recipient.length, 0);
-        recipient.write(message.recipient, 2, 'utf-8');
-        return recipient;
+    _serializeRecipient(recipientCertPath) {
+        const cert = fs.readFileSync(recipientCertPath);
+        const recipientAddress = getAddressFromCert(cert);
+        const recipientAddressBuffer = Buffer.from(recipientAddress, 'utf-8');
+        const lengthPrefix = Buffer.allocUnsafe(2);
+        lengthPrefix.writeUInt16LE(recipientAddressBuffer.length);
+        return Buffer.concat([lengthPrefix, recipientAddressBuffer]);
     }
 
     _serializeSignatureHashAlgo(hashAlgo) {

@@ -5,9 +5,9 @@
 const assert = require('assert').strict;
 const fs = require('fs');
 const yargs = require('yargs');
-const {certificateFromPem} = require('node-forge').pki;
-const {derCertToPem} = require('../messages/_asn1_utils');
 const {CARGO_SERIALIZER, PARCEL_SERIALIZER} = require('../messages/serialization');
+const {derCertToPem} = require('../messages/_asn1_utils');
+const {getAddressFromCert} = require('../messages/utils');
 
 const SERIALIZER_BY_TAG = {
     C: CARGO_SERIALIZER,
@@ -46,7 +46,7 @@ async function main(argv) {
     console.log(`Message type: ${message.constructor.name}
 Recipient: ${message.recipient}
 Sender certificate:
-  Address: ${getSubjectAltNameFromCert(message.senderCert)}
+  Address: ${getAddressFromCert(derCertToPem(message.senderCert))}
   Size: ${message.senderCert.length} octets
 Payload: ${message.payload.length} octets`);
 
@@ -55,15 +55,6 @@ Payload: ${message.payload.length} octets`);
         const payloadOutput = (argv.decodePayload) ? payloadDecrypted.toString('utf-8') : payloadDecrypted;
         console.log('Payload decrypted:', payloadOutput);
     }
-}
-
-function getSubjectAltNameFromCert(certDer) {
-    const cert = certificateFromPem(derCertToPem(certDer));
-    const extension = cert.getExtension('subjectAltName');
-    assert.equal(extension.altNames.length, 1, 'There must be exactly one alt name');
-    const altName = extension.altNames[0];
-    assert.equal(altName.type, 6, 'The alt name must be of type URI');
-    return altName.value;
 }
 
 yargs
