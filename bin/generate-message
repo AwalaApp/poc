@@ -19,7 +19,12 @@ async function main(argv) {
         fs.readFileSync(process.stdin.fd),
     );
 
-    process.stdout.write(await PARCEL_SERIALIZER.serialize(parcel, argv.recipientCert));
+    process.stdout.write(await PARCEL_SERIALIZER.serialize(
+        parcel,
+        argv.recipientCert,
+        argv.senderKey,
+        argv.signHashAlgo,
+    ));
 }
 
 const argv = yargs
@@ -38,11 +43,24 @@ const argv = yargs
         demandOption: true,
         requiresArg: true,
         description: "The recipient's X.509 certificate (chain), DER-encoded",
+        normalize: true,
     })
     .option('sender-cert', {
         demandOption: true,
         requiresArg: true,
         description: "The sender's X.509 certificate (chain), PEM-encoded",
+        normalize: true,
+    })
+    .option('sender-key', {
+        demandOption: true,
+        requiresArg: true,
+        description: "The sender's X.509 key to sign the message (PEM-encoded)",
+        normalize: true,
+    })
+    .option('sign-hash-algo', {
+        requiresArg: true,
+        default: 'sha256',
+        description: 'The hashing algorithm to use in the signature',
     })
     .help()
     .argv;

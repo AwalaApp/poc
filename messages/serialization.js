@@ -2,12 +2,9 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const BParser = require('binary-parser').Parser;
-const crypto = require('crypto');
-const openssl = require('openssl-wrapper');
+const cms = require('./_cms');
 const {Cargo, Parcel} = require('./index');
-const {promisify} = require('util');
-
-const opensslExec = promisify(openssl.exec);
+const {pemCertToDer} = require('./_asn1_utils');
 
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer
 const MAX_PAYLOAD_SIZE = (2 ** 32) - 1; // 32-bit, unsigned integer
@@ -44,17 +41,18 @@ class MessageV1Serializer {
             // Needless to say the payload mustn't be loaded in memory in real life
             .buffer('payloadRaw', {length: 'payloadLength'})
             .uint16('signatureLength', {length: 2})
-            .buffer('signatureRaw', {length: 'signatureLength'})
+            .buffer('signature', {length: 'signatureLength'})
             ;
     }
 
     /**
      * @param message
      * @param {string} recipientCertPath Path to the recipient's X.509. Should be a buffer in "real life".
+     * @param {string} senderKeyPath
      * @param {string} signatureHashAlgo
      * @returns {Buffer}
      */
-    async serialize(message, recipientCertPath, signatureHashAlgo = 'sha256') {
+    async serialize(message, recipientCertPath, senderKeyPath, signatureHashAlgo) {
         const formatSignature = Buffer.allocUnsafe(10);
         formatSignature.write('Relaynet');
         formatSignature.writeUInt8(this._signature, 8);
@@ -67,7 +65,12 @@ class MessageV1Serializer {
             await this._serializePayload(message.payload, recipientCertPath),
         ]);
 
-        const signature = this._serializeSignature(partialMessageSerialization, signatureHashAlgo);
+        const signature = await this._serializeSignature(
+            partialMessageSerialization,
+            senderKeyPath,
+            message.senderCert,
+            signatureHashAlgo,
+        );
         return Buffer.concat([partialMessageSerialization, signature]);
     }
 
@@ -85,23 +88,20 @@ class MessageV1Serializer {
         return hashAlgoBuffer;
     }
 
-    _serializeSenderCert(cert) {
-        const certLength = cert.length;
+    _serializeSenderCert(certPem) {
+        const certDer = pemCertToDer(certPem);
+        const certLength = certDer.length;
         if (MAX_SENDER_CERT_SIZE < certLength) {
             throw new Error(`Sender's certificate can't exceed ${MAX_SENDER_CERT_SIZE} octets`);
         }
         const lengthPrefix = Buffer.allocUnsafe(2);
         lengthPrefix.writeUInt16LE(certLength, 0);
-        return Buffer.concat([lengthPrefix, cert]);
+        return Buffer.concat([lengthPrefix, certDer]);
     }
 
     async _serializePayload(payloadRaw, recipientCertPath) {
         // TODO: Support "data" type (i.e., unencrypted payload)
-        const ciphertext = await opensslExec('cms.encrypt', payloadRaw, {
-            binary: true,
-            outform: 'DER',
-            [recipientCertPath]: false,
-        });
+        const ciphertext = await cms.encrypt(payloadRaw, recipientCertPath);
         const length = ciphertext.length;
         if (MAX_PAYLOAD_SIZE < length) {
             throw new Error('Payload exceeds maximum length of 32-bit');
@@ -111,27 +111,34 @@ class MessageV1Serializer {
         return Buffer.concat([lengthPrefix, ciphertext], length + 4);
     }
 
-    _serializeSignature(partialMessageSerialization, signatureHashAlgo) {
-        // TODO: Implement actual signing!
-        const shasum = crypto.createHash(signatureHashAlgo);
-        shasum.update(partialMessageSerialization);
-        const signatureRaw = Buffer.from(shasum.digest());
-        const signatureLength = signatureRaw.length;
+    async _serializeSignature(partialMessageSerialization, senderKeyPath, senderCert, hashAlgorithm) {
+        const signature = await cms.sign(
+            partialMessageSerialization,
+            senderKeyPath,
+            senderCert,
+            hashAlgorithm,
+        );
+        const signatureLength = signature.length;
         if (MAX_SIGNATURE_SIZE < signatureLength) {
             throw new Error(`Signature cannot exceed ${MAX_SIGNATURE_SIZE} octets`);
         }
         const lengthPrefix = Buffer.allocUnsafe(2);
         lengthPrefix.writeUInt16LE(signatureLength, 0);
-        return Buffer.concat([lengthPrefix, signatureRaw]);
+        return Buffer.concat([lengthPrefix, signature]);
     }
 
-    deserialize(buffer) {
+    async deserialize(buffer) {
         const ast = this._parser.parse(buffer);
+
+        // Verify signature and error out if it's invalid
+        const signatureBlockLength = ast.signature.length + 2;
+        const plaintext = buffer.slice(0, signatureBlockLength * (-1));
+        await cms.verifySignature(plaintext, ast.signature, ast.senderCert);
+
         return new this._messageClass(
             ast.recipient,
             ast.senderCert,
             ast.payloadRaw,
-            ast.signatureRaw,
         );
     }
 }

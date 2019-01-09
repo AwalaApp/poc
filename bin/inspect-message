@@ -39,7 +39,7 @@ async function main(argv) {
     const serializer = SERIALIZER_BY_TAG[fileTag];
     assert(serializer, `Message tag must be either parcel or cargo, not "${fileTag}"`);
 
-    const message = serializer.deserialize(messageRaw);
+    const message = await serializer.deserialize(messageRaw);
     console.log(message);
 
     if (argv.recipientKey) {

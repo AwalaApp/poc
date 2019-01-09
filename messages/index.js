@@ -1,30 +1,22 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-const openssl = require('openssl-wrapper');
-const {promisify} = require('util');
-
-const opensslExec = promisify(openssl.exec);
+const {decrypt} = require('./_cms');
 
 /**
  * Relaynet Abstract Message v1
  *
- * In real life, this would be a stream wrapping `payload`.
+ * In real life, this would be a *stream* (wrapping the payload).
  */
 class Message {
-    constructor(recipient, senderCert, payload, signature) {
+    constructor(recipient, senderCert, payload) {
         this.recipient = recipient;
         this.payload = payload;
         this.senderCert = senderCert;
-        this.signature = signature;
     }
 
     async decryptPayload(privateKeyPath) {
-        return await opensslExec('cms.decrypt', this.payload, {
-            binary: true,
-            inform: 'DER',
-            inkey: privateKeyPath,
-        });
+        return await decrypt(this.payload, privateKeyPath);
     }
 }
 
