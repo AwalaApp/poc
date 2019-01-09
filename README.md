@@ -42,7 +42,7 @@ Similar to the example above, but using an adapter run by a third party (so not 
 
 ### Generating messages
 
-The following will generate a parcel for the endpoint `rne:targetEndpointAddr`, from the endpoint whose X.509 certificate (chain) is available at `samples/alice_cert.der`. The payload will be the contents of `samples/payload.txt`.
+The following will generate a _parcel_ from the _endpoint_ Alice to the _endpoint_ Bob, encrypted with Bob's X.509 certificate and signed with Alice' private key. The payload will be the contents of `samples/payload.txt`.
 
 ```bash
 ./bin/generate-message \
