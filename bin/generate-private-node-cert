@@ -9,8 +9,8 @@ ADDRESS_SCHEME="$1"
 CERT_PATH="$2"
 KEY_PATH="$3"
 
-openssl ecparam -name prime256v1 -genkey -noout -out "${KEY_PATH}"
-PUBLIC_KEY_FINGERPRINT="$(openssl ec -in "${KEY_PATH}" -pubout -outform DER 2>/dev/null | sha256sum --binary | awk '{ print $1 }')"
+openssl genrsa -out "${KEY_PATH}" 4096
+PUBLIC_KEY_FINGERPRINT="$(openssl rsa -in "${KEY_PATH}" -pubout -outform DER 2>/dev/null | sha256sum --binary | awk '{ print $1 }')"
 
 ADDRESS="${ADDRESS_SCHEME}:0${PUBLIC_KEY_FINGERPRINT:0:32}"
 
@@ -33,7 +33,6 @@ subjectAltName = URI:${ADDRESS}
 EOF
 ) \
     -key "${KEY_PATH}" \
-    -outform der \
     -out "${CERT_PATH}"
 
 echo "Generated certificate with address ${ADDRESS}"
