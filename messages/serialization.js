@@ -47,6 +47,61 @@ class MessageV1Serializer {
             ;
     }
 
+    static _serializeRecipient(recipientCertPath) {
+        const cert = fs.readFileSync(recipientCertPath);
+        const recipientAddress = getAddressFromCert(cert);
+        const recipientAddressBuffer = Buffer.from(recipientAddress, 'utf-8');
+        const lengthPrefix = Buffer.allocUnsafe(2);
+        lengthPrefix.writeUInt16LE(recipientAddressBuffer.length, 0);
+        return Buffer.concat([lengthPrefix, recipientAddressBuffer]);
+    }
+
+    static _serializeSignatureHashAlgo(hashAlgo) {
+        const hashAlgoBuffer = Buffer.alloc(8); // Zero-filled per spec
+        // Don't truncate silently in the final implementation
+        hashAlgoBuffer.write(hashAlgo, 'ascii');
+        return hashAlgoBuffer;
+    }
+
+    static _serializeSenderCert(certPem) {
+        const certDer = pemCertToDer(certPem);
+        const certLength = certDer.length;
+        if (MAX_SENDER_CERT_SIZE < certLength) {
+            throw new Error(`Sender's certificate can't exceed ${MAX_SENDER_CERT_SIZE} octets`);
+        }
+        const lengthPrefix = Buffer.allocUnsafe(2);
+        lengthPrefix.writeUInt16LE(certLength, 0);
+        return Buffer.concat([lengthPrefix, certDer]);
+    }
+
+    async static _serializePayload(payloadRaw, recipientCertPath) {
+        // TODO: Support "data" type (i.e., unencrypted payload)
+        const ciphertext = await cms.encrypt(payloadRaw, recipientCertPath);
+        const length = ciphertext.length;
+        if (MAX_PAYLOAD_SIZE < length) {
+            throw new Error('Payload exceeds maximum length of 32-bit');
+        }
+        const lengthPrefix = Buffer.allocUnsafe(4);
+        lengthPrefix.writeUInt32LE(length, 0);
+        return Buffer.concat([lengthPrefix, ciphertext], length + 4);
+    }
+
+    async static _serializeSignature(partialMessageSerialization, senderKeyPath, senderCert, hashAlgorithm) {
+        const signature = await cms.sign(
+            partialMessageSerialization,
+            senderKeyPath,
+            senderCert,
+            hashAlgorithm,
+        );
+        const signatureLength = signature.length;
+        if (MAX_SIGNATURE_SIZE < signatureLength) {
+            throw new Error(`Signature cannot exceed ${MAX_SIGNATURE_SIZE} octets`);
+        }
+        const lengthPrefix = Buffer.allocUnsafe(2);
+        lengthPrefix.writeUInt16LE(signatureLength, 0);
+        return Buffer.concat([lengthPrefix, signature]);
+    }
+
     /**
      * @param payload
      * @param {string} recipientCertPath Path to the recipient's X.509. Should be a buffer in "real life".
@@ -62,74 +117,19 @@ class MessageV1Serializer {
         formatSignature.writeUInt8(this._version, 9);
         const partialMessageSerialization = Buffer.concat([
             formatSignature,
-            this._serializeSignatureHashAlgo(signatureHashAlgo),
-            this._serializeRecipient(recipientCertPath),
-            this._serializeSenderCert(senderCert),
-            await this._serializePayload(payload, recipientCertPath),
+            this.constructor._serializeSignatureHashAlgo(signatureHashAlgo),
+            this.constructor._serializeRecipient(recipientCertPath),
+            this.constructor._serializeSenderCert(senderCert),
+            await this.constructor._serializePayload(payload, recipientCertPath),
         ]);
 
-        const signature = await this._serializeSignature(
+        const signature = await this.constructor._serializeSignature(
             partialMessageSerialization,
             senderKeyPath,
             senderCert,
             signatureHashAlgo,
         );
         return Buffer.concat([partialMessageSerialization, signature]);
-    }
-
-    _serializeRecipient(recipientCertPath) {
-        const cert = fs.readFileSync(recipientCertPath);
-        const recipientAddress = getAddressFromCert(cert);
-        const recipientAddressBuffer = Buffer.from(recipientAddress, 'utf-8');
-        const lengthPrefix = Buffer.allocUnsafe(2);
-        lengthPrefix.writeUInt16LE(recipientAddressBuffer.length);
-        return Buffer.concat([lengthPrefix, recipientAddressBuffer]);
-    }
-
-    _serializeSignatureHashAlgo(hashAlgo) {
-        const hashAlgoBuffer = Buffer.alloc(8); // Zero-filled per spec
-        // Don't truncate silently in the final implementation
-        hashAlgoBuffer.write(hashAlgo, 'ascii');
-        return hashAlgoBuffer;
-    }
-
-    _serializeSenderCert(certPem) {
-        const certDer = pemCertToDer(certPem);
-        const certLength = certDer.length;
-        if (MAX_SENDER_CERT_SIZE < certLength) {
-            throw new Error(`Sender's certificate can't exceed ${MAX_SENDER_CERT_SIZE} octets`);
-        }
-        const lengthPrefix = Buffer.allocUnsafe(2);
-        lengthPrefix.writeUInt16LE(certLength, 0);
-        return Buffer.concat([lengthPrefix, certDer]);
-    }
-
-    async _serializePayload(payloadRaw, recipientCertPath) {
-        // TODO: Support "data" type (i.e., unencrypted payload)
-        const ciphertext = await cms.encrypt(payloadRaw, recipientCertPath);
-        const length = ciphertext.length;
-        if (MAX_PAYLOAD_SIZE < length) {
-            throw new Error('Payload exceeds maximum length of 32-bit');
-        }
-        const lengthPrefix = Buffer.allocUnsafe(4);
-        lengthPrefix.writeUInt32LE(length, 0);
-        return Buffer.concat([lengthPrefix, ciphertext], length + 4);
-    }
-
-    async _serializeSignature(partialMessageSerialization, senderKeyPath, senderCert, hashAlgorithm) {
-        const signature = await cms.sign(
-            partialMessageSerialization,
-            senderKeyPath,
-            senderCert,
-            hashAlgorithm,
-        );
-        const signatureLength = signature.length;
-        if (MAX_SIGNATURE_SIZE < signatureLength) {
-            throw new Error(`Signature cannot exceed ${MAX_SIGNATURE_SIZE} octets`);
-        }
-        const lengthPrefix = Buffer.allocUnsafe(2);
-        lengthPrefix.writeUInt16LE(signatureLength, 0);
-        return Buffer.concat([lengthPrefix, signature]);
     }
 
     async deserialize(buffer) {
