@@ -1,0 +1,57 @@
+#!/usr/bin/env node
+'use strict';
+// This is a proof of concept. The code below is ugly, inefficient and has no tests.
+
+const assert = require('assert');
+const fs = require('fs');
+const yargs = require('yargs');
+const {CARGO_SERIALIZER} = require('../messages/serialization');
+const {serializeCargoPayload} = require('../messages/serialization');
+
+function configureArgs(builder) {
+    builder
+        .option('recipient-cert', {
+            demandOption: true,
+            requiresArg: true,
+            description: "The recipient's X.509 certificate (chain), PEM-encoded",
+            normalize: true,
+        })
+        .option('sender-cert', {
+            demandOption: true,
+            requiresArg: true,
+            description: "The sender's X.509 certificate (chain), PEM-encoded",
+            normalize: true,
+        })
+        .option('sender-key', {
+            demandOption: true,
+            requiresArg: true,
+            description: "The sender's X.509 key (PEM-encoded) to sign the message",
+            normalize: true,
+        })
+        .option('sign-hash-algo', {
+            requiresArg: true,
+            default: 'sha256',
+            description: 'The hashing algorithm to use in the signature',
+        })
+        .normalize('parcel')
+    ;
+}
+
+async function main(argv) {
+    const parcelPaths = argv.parcel || [];
+    assert(parcelPaths.length, 'One or more parcels must be passed');
+    const parcels = parcelPaths.map(p => fs.readFileSync(p));
+    process.stdout.write(await CARGO_SERIALIZER.serialize(
+        serializeCargoPayload(...parcels),
+        argv.recipientCert,
+        fs.readFileSync(argv.senderCert),
+        argv.senderKey,
+        argv.signHashAlgo,
+    ));
+}
+
+yargs
+    .command('$0 [parcel..]', 'Generate cargo', configureArgs, main)
+    .strict()
+    .help()
+    .argv;

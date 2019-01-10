@@ -74,7 +74,7 @@ class MessageV1Serializer {
         return Buffer.concat([lengthPrefix, certDer]);
     }
 
-    async static _serializePayload(payloadRaw, recipientCertPath) {
+    static async _serializePayload(payloadRaw, recipientCertPath) {
         // TODO: Support "data" type (i.e., unencrypted payload)
         const ciphertext = await cms.encrypt(payloadRaw, recipientCertPath);
         const length = ciphertext.length;
@@ -86,7 +86,7 @@ class MessageV1Serializer {
         return Buffer.concat([lengthPrefix, ciphertext], length + 4);
     }
 
-    async static _serializeSignature(partialMessageSerialization, senderKeyPath, senderCert, hashAlgorithm) {
+    static async _serializeSignature(partialMessageSerialization, senderKeyPath, senderCert, hashAlgorithm) {
         const signature = await cms.sign(
             partialMessageSerialization,
             senderKeyPath,
@@ -151,7 +151,35 @@ class MessageV1Serializer {
 const CARGO_SERIALIZER = new MessageV1Serializer('C'.charCodeAt(0), 1, Cargo);
 const PARCEL_SERIALIZER = new MessageV1Serializer('P'.charCodeAt(0), 1, Parcel);
 
+function serializeCargoPayload(...parcels) {
+    // Needless to say the final implementation won't be loading everything in memory
+    const parcelsLengthPrefixed = parcels.map(parcel => {
+        const parcelLength = parcel.length;
+        const parcelLengthPrefixed = Buffer.allocUnsafe(4 + parcelLength);
+        parcelLengthPrefixed.writeUInt32LE(parcelLength, 0);
+        parcel.copy(parcelLengthPrefixed, 4);
+        return parcelLengthPrefixed;
+    });
+    return Buffer.concat(parcelsLengthPrefixed);
+}
+
+function deserializeCargoPayload(payload) {
+    const parcels = [];
+
+    let index = 0;
+    while (index < payload.length) {
+        const parcelLength = payload.readUInt32LE(index);
+        index += 4;
+        parcels.push(payload.slice(index, index + parcelLength));
+        index += parcelLength;
+    }
+
+    return parcels;
+}
+
 module.exports = {
     CARGO_SERIALIZER,
     PARCEL_SERIALIZER,
+    serializeCargoPayload,
+    deserializeCargoPayload,
 };

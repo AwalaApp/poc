@@ -40,29 +40,81 @@ Similar to the example above, but using an adapter run by a third party (so not 
 
 ## Development utilities
 
-### Generating messages
+### Generating private keys and certificates
 
-The following will generate a _parcel_ from the _endpoint_ Alice to the _endpoint_ Bob, encrypted with Bob's X.509 certificate and signed with Alice' private key. The payload will be the contents of `samples/payload.txt`.
+The following will generate a private key with a corresponding certificate for an endpoint with an opaque address:
 
 ```bash
-./bin/generate-message \
-    --type parcel \
-    --recipient-cert samples/bob_cert.pem \
-    --sender-cert samples/alice_cert.pem \
-    --sender-key samples/alice_key.pem \
-    < samples/payload.txt \
+./bin/generate-private-node-cert rneo /tmp/endpoint_cert.pem /tmp/endpoint_key.pem
+```
+
+The following will generate a private key with a corresponding certificate for a gateway with an opaque address:
+
+```bash
+./bin/generate-private-node-cert rngo /tmp/endpoint_cert.pem /tmp/endpoint_key.pem
+```
+
+To generate a private key and a corresponding certificate for a _host endpoint_ or _host gateway_ (i.e., one whose address is a domain name or an IP address), follow the process you'd normally follow, but make sure the Relaynet address is specified in the `Subject Alternative Name` extension as a URI. For example, use `openssl` to generate a _Certificate Signing Request_ (CSR) and a private key, and send the CSR to a _Certificate Authority_ (CA).
+
+### Generating and inspecting parcels
+
+The following will generate a _parcel_ from the _endpoint_ E1 to the _endpoint_ E2, encrypted with E2's X.509 certificate and signed with E1's private key. The payload will be the ASCII string `Winter is coming` (but it could be anything, even a binary stream).
+
+```bash
+./bin/generate-private-node-cert rneo /tmp/e1_cert.pem /tmp/e1_key.pem
+./bin/generate-private-node-cert rneo /tmp/e2_cert.pem /tmp/e2_key.pem
+
+echo "Winter is coming" | ./bin/generate-parcel \
+    --recipient-cert /tmp/e2_cert.pem \
+    --sender-cert /tmp/e1_cert.pem \
+    --sender-key /tmp/e1_key.pem \
     > /tmp/output.parcel
 ```
 
-The parcel would've been saved to `/tmp/output.parcel`.
-
-### Inspecting messages
-
-Example with the parcel generated above:
+The parcel would've been saved to `/tmp/output.parcel`. Its contents could then be inspected and (optionally) decrypted with `inspect-message` -- for example:
 
 ```bash
 ./bin/inspect-message \
-    --recipient-key samples/bob_key.pem \
+    --recipient-key /tmp/e2_key.pem \
     --decode-payload \
-    /tmp/output.parcel
+    < /tmp/output.parcel
+```
+
+Also handy during development, to detect regressions as soon as possible:
+
+```bash
+echo "Winter is coming" | ./bin/generate-parcel \
+    --recipient-cert /tmp/e2_cert.pem \
+    --sender-cert /tmp/e1_cert.pem \
+    --sender-key /tmp/e1_key.pem \
+    | \
+    ./bin/inspect-message \
+        --recipient-key /tmp/e2_key.pem \
+        --decode-payload
+```
+
+### Generating and inspecting cargoes
+
+The following will generate a _cargo_ from the _gateway_ G1 to the _endpoint_ G2, encrypted with G2's X.509 certificate and signed with G1's private key. The payload will be two parcels: `/tmp/01.parcel` and `/tmp/02.parcel`, which could've been created with `generate-parcel`.
+
+```bash
+./bin/generate-private-node-cert rngo /tmp/g1_cert.pem /tmp/g1_key.pem
+./bin/generate-private-node-cert rngo /tmp/g2_cert.pem /tmp/g2_key.pem
+
+./bin/generate-cargo \
+    --recipient-cert /tmp/g2_cert.pem \
+    --sender-cert /tmp/g1_cert.pem \
+    --sender-key /tmp/g1_key.pem \
+    /tmp/01.parcel \
+    /tmp/02.parcel \
+    > /tmp/output.cargo
+```
+
+The cargo would've been saved to `/tmp/output.cargo`. Its contents could then be inspected and (optionally) decrypted with `inspect-message` -- for example:
+
+```bash
+./bin/inspect-message \
+  --recipient-key /tmp/g2_key.pem \
+  --decode-payload \
+  < /tmp/output.cargo
 ```
