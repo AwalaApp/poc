@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+'use strict';
+// This is a proof of concept. The code below is ugly, inefficient and has no tests.
+
+const {runServer} = require('../PogRPC/gateway');
+
+runServer();

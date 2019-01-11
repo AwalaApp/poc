@@ -1,0 +1,22 @@
+syntax = "proto3";
+package twitter.relaynet_poc;
+
+// NB: Protocol Buffers is only used to serialize the messages. No RPC here -- We're actually trying to move away from them!
+
+import "google/protobuf/timestamp.proto";
+
+message TwitterCredentials {
+    string access_token_key = 1;
+
+    string access_token_secret = 2;
+}
+
+message Tweet {
+    TwitterCredentials credentials = 1;
+
+    google.protobuf.Timestamp creation_date = 2;
+
+    string status = 3;
+
+    string author = 4;
+}

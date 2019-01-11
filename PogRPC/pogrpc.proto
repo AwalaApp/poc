@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package relaynet.pogrpc;
+
+message ParcelDelivery {
+    string id = 1;
+    bytes parcel = 2;
+}
+
+message ParcelDeliveryAck {
+}
+
+message ParcelCollectionRequest {
+}
+
+service PogRPC {
+    rpc DeliverParcel (ParcelDelivery) returns (ParcelDeliveryAck);
+
+    rpc CollectParcels (ParcelCollectionRequest) returns (stream ParcelDelivery);
+}
