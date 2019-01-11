@@ -4,7 +4,7 @@ This monorepo implements a proof of concept of Twitter running on [Relaynet](htt
 
 # High-Level Intro to Relaynet
 
-Relaynet is a message-passing protocol suite that will make it possible to relay data outside the Internet, via [sneakernets](https://en.wikipedia.org/wiki/Sneakernet) or wireless systems, using end-to-end encryption. **Its designed to circumvent government-sponsored [Internet blackouts](https://www.accessnow.org/keepiton/).**
+Relaynet is a message-passing protocol suite that will make it possible to relay data outside the Internet, via [sneakernets](https://en.wikipedia.org/wiki/Sneakernet) or wireless systems, using end-to-end encryption. **It's designed to circumvent government-sponsored [Internet blackouts](https://www.accessnow.org/keepiton/).**
 
 To achieve this, it will make existing and future Internet-dependent systems (e.g., social networks) tolerant to latencies lasting anywhere from hours to weeks by helping them adopt an asynchronous messaging pattern -- as opposed to the Remote Procedure Call (RPC) pattern that HTTP-based APIs depend on, which assumes a reliable connection.
 
