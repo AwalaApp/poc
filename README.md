@@ -95,7 +95,7 @@ echo "Winter is coming" | ./bin/generate-parcel \
 
 ### Generating and inspecting cargoes
 
-The following will generate a _cargo_ from the _gateway_ G1 to the _endpoint_ G2, encrypted with G2's X.509 certificate and signed with G1's private key. The payload will be two parcels: `/tmp/01.parcel` and `/tmp/02.parcel`, which could've been created with `generate-parcel`.
+The following will generate a _cargo_ from _gateway_ G1 to _gateway_ G2, encrypted with G2's X.509 certificate and signed with G1's private key. The payload will be two parcels: `/tmp/01.parcel` and `/tmp/02.parcel`, which could've been created with `generate-parcel`.
 
 ```bash
 ./bin/generate-private-node-cert rngo /tmp/g1_cert.pem /tmp/g1_key.pem
