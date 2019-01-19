@@ -8,13 +8,11 @@ message ParcelDelivery {
 }
 
 message ParcelDeliveryAck {
-}
-
-message ParcelCollectionRequest {
+    string id = 1;
 }
 
 service PogRPC {
-    rpc DeliverParcel (ParcelDelivery) returns (ParcelDeliveryAck);
+    rpc DeliverParcels (stream ParcelDelivery) returns (stream ParcelDeliveryAck);
 
-    rpc CollectParcels (ParcelCollectionRequest) returns (stream ParcelDelivery);
+    rpc CollectParcels (stream ParcelDeliveryAck) returns (stream ParcelDelivery);
 }
