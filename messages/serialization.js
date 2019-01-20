@@ -4,11 +4,13 @@
 const BParser = require('binary-parser').Parser;
 const cms = require('./_cms');
 const fs = require('fs');
+const uuid4 = require('uuid4');
 const {Cargo, Parcel} = require('./index');
 const {getAddressFromCert} = require('./utils');
 const {pemCertToDer} = require('./_asn1_utils');
 
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer
+const MAX_ID_SIZE = (2 ** 16); // 16-bit, unsigned integer
 const MAX_PAYLOAD_SIZE = (2 ** 32) - 1; // 32-bit, unsigned integer
 const MAX_SIGNATURE_SIZE = (2 ** 12) - 1; // 12-bit, unsigned integer
 
@@ -39,9 +41,11 @@ class MessageV1Serializer {
             .string('recipient', {length: 'recipientLength'})
             .uint16('senderCertLength', {length: 2})
             .buffer('senderCert', {length: 'senderCertLength'})
+            .uint16('idLength', {length: 2})
+            .string('id', {length: 'idLength', encoding: 'ascii'})
             .uint32('payloadLength', {length: 4})
             // Needless to say the payload mustn't be loaded in memory in real life
-            .buffer('payloadRaw', {length: 'payloadLength'})
+            .buffer('payload', {length: 'payloadLength'})
             .uint16('signatureLength', {length: 2})
             .buffer('signature', {length: 'signatureLength'})
             ;
@@ -74,9 +78,19 @@ class MessageV1Serializer {
         return Buffer.concat([lengthPrefix, certDer]);
     }
 
-    static async _serializePayload(payloadRaw, recipientCertPath) {
+    static _serializeId(id) {
+        const idBuffer = Buffer.from(id || uuid4());
+        if (MAX_ID_SIZE < idBuffer.length) {
+            throw new Error(`The message's id can't exceed ${MAX_ID_SIZE} octets`);
+        }
+        const lengthPrefix = Buffer.allocUnsafe(2);
+        lengthPrefix.writeUInt16LE(idBuffer.length, 0);
+        return Buffer.concat([lengthPrefix, idBuffer]);
+    }
+
+    static async _serializePayload(payload, recipientCertPath) {
         // TODO: Support "data" type (i.e., unencrypted payload)
-        const ciphertext = await cms.encrypt(payloadRaw, recipientCertPath);
+        const ciphertext = await cms.encrypt(payload, recipientCertPath);
         const length = ciphertext.length;
         if (MAX_PAYLOAD_SIZE < length) {
             throw new Error('Payload exceeds maximum length of 32-bit');
@@ -108,9 +122,10 @@ class MessageV1Serializer {
      * @param {string} senderCert
      * @param {string} senderKeyPath
      * @param {string} signatureHashAlgo
+     * @param {string|null} id If absent, an id will be generated
      * @returns {Buffer}
      */
-    async serialize(payload, recipientCertPath, senderCert, senderKeyPath, signatureHashAlgo) {
+    async serialize(payload, recipientCertPath, senderCert, senderKeyPath, signatureHashAlgo, id = null) {
         const formatSignature = Buffer.allocUnsafe(10);
         formatSignature.write('Relaynet');
         formatSignature.writeUInt8(this._signature, 8);
@@ -120,6 +135,7 @@ class MessageV1Serializer {
             this.constructor._serializeSignatureHashAlgo(signatureHashAlgo),
             this.constructor._serializeRecipient(recipientCertPath),
             this.constructor._serializeSenderCert(senderCert),
+            this.constructor._serializeId(id),
             await this.constructor._serializePayload(payload, recipientCertPath),
         ]);
 
@@ -143,7 +159,8 @@ class MessageV1Serializer {
         return new this._messageClass(
             ast.recipient,
             ast.senderCert,
-            ast.payloadRaw,
+            ast.id,
+            ast.payload,
         );
     }
 }

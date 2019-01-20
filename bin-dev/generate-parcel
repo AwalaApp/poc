@@ -13,6 +13,7 @@ async function main(argv) {
         fs.readFileSync(argv.senderCert),
         argv.senderKey,
         argv.signHashAlgo,
+        argv.id,
     ));
 }
 
@@ -39,6 +40,10 @@ const argv = yargs
         requiresArg: true,
         default: 'sha256',
         description: 'The hashing algorithm to use in the signature',
+    })
+    .option('id', {
+        requiresArg: true,
+        description: "The message's unique id",
     })
     .strict()
     .help()

@@ -54,6 +54,7 @@ function formatMessageInfo(message, indent = false) {
 Sender certificate:
   Address: ${getAddressFromCert(derCertToPem(message.senderCert))}
   Size: ${message.senderCert.length} octets
+Id: ${message.id}
 Payload:
   Size: ${message.payload.length} octets`;
 
