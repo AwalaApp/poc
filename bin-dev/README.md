@@ -1,0 +1,82 @@
+# Development tools
+
+This directory contains scripts that were handy during the development of the PoC, and could also be handy early on in an eventual production-ready implementation.
+
+## Generating private keys and certificates
+
+Use [`generate-private-node-cert`](generate-private-node-cert) to generate a private key with a corresponding certificate for an endpoint with an opaque address:
+
+```bash
+./generate-private-node-cert rneo /tmp/endpoint_cert.pem /tmp/endpoint_key.pem
+```
+
+The following will generate a private key with a corresponding certificate for a gateway with an opaque address:
+
+```bash
+./generate-private-node-cert rngo /tmp/endpoint_cert.pem /tmp/endpoint_key.pem
+```
+
+To generate a private key and a corresponding certificate for a _host endpoint_ or _host gateway_ (i.e., one whose address is a domain name or an IP address), follow the process you'd normally follow, but make sure the Relaynet address is specified in the `Subject Alternative Name` extension as a URI. For example, use `openssl` to generate a _Certificate Signing Request_ (CSR) and a private key, and send the CSR to a _Certificate Authority_ (CA).
+
+## Generating and inspecting parcels
+
+[`generate-parcel`](generate-parcel) can be used to create parcels. The following will generate a _parcel_ from the _endpoint_ E1 to the _endpoint_ E2, encrypted with E2's X.509 certificate and signed with E1's private key. The payload will be the ASCII string `Winter is coming` (but it could be anything, even a binary stream).
+
+```bash
+./generate-private-node-cert rneo /tmp/e1_cert.pem /tmp/e1_key.pem
+./generate-private-node-cert rneo /tmp/e2_cert.pem /tmp/e2_key.pem
+
+echo "Winter is coming" | ./generate-parcel \
+    --recipient-cert /tmp/e2_cert.pem \
+    --sender-cert /tmp/e1_cert.pem \
+    --sender-key /tmp/e1_key.pem \
+    > /tmp/output.parcel
+```
+
+The parcel would've been saved to `/tmp/output.parcel`. Its contents could then be inspected and (optionally) decrypted with [`inspect-message`](inspect-message) -- for example:
+
+```bash
+./inspect-message \
+    --recipient-key /tmp/e2_key.pem \
+    --decode-payload \
+    < /tmp/output.parcel
+```
+
+Also handy during development, to detect regressions as soon as possible:
+
+```bash
+echo "Winter is coming" | ./generate-parcel \
+    --recipient-cert /tmp/e2_cert.pem \
+    --sender-cert /tmp/e1_cert.pem \
+    --sender-key /tmp/e1_key.pem \
+    | \
+    ./inspect-message \
+        --recipient-key /tmp/e2_key.pem \
+        --decode-payload
+```
+
+## Generating and inspecting cargoes
+
+[`generate-parcel`](generate-cargo) can be used to create cargoes. The following will generate a _cargo_ from _gateway_ G1 to _gateway_ G2, encrypted with G2's X.509 certificate and signed with G1's private key. The payload will be two parcels: `/tmp/01.parcel` and `/tmp/02.parcel`, which could've been created with `generate-parcel`.
+
+```bash
+./generate-private-node-cert rngo /tmp/g1_cert.pem /tmp/g1_key.pem
+./generate-private-node-cert rngo /tmp/g2_cert.pem /tmp/g2_key.pem
+
+./generate-cargo \
+    --recipient-cert /tmp/g2_cert.pem \
+    --sender-cert /tmp/g1_cert.pem \
+    --sender-key /tmp/g1_key.pem \
+    /tmp/01.parcel \
+    /tmp/02.parcel \
+    > /tmp/output.cargo
+```
+
+The cargo would've been saved to `/tmp/output.cargo`. Its contents could then be inspected and (optionally) decrypted with [`inspect-message`](inspect-message) -- for example:
+
+```bash
+./inspect-message \
+  --recipient-key /tmp/g2_key.pem \
+  --decode-payload \
+  < /tmp/output.cargo
+```
