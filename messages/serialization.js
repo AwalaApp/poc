@@ -10,7 +10,8 @@ const {getAddressFromCert} = require('./utils');
 const {pemCertToDer} = require('./_asn1_utils');
 
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer
-const MAX_ID_SIZE = (2 ** 16); // 16-bit, unsigned integer
+const MAX_ID_SIZE = (2 ** 16) - 1; // 16-bit, unsigned integer
+const MAX_DATE_SIZE = (2 ** 32) - 1; // 32-bit, unsigned integer
 const MAX_PAYLOAD_SIZE = (2 ** 32) - 1; // 32-bit, unsigned integer
 const MAX_SIGNATURE_SIZE = (2 ** 12) - 1; // 12-bit, unsigned integer
 
@@ -43,6 +44,7 @@ class MessageV1Serializer {
             .buffer('senderCert', {length: 'senderCertLength'})
             .uint16('idLength', {length: 2})
             .string('id', {length: 'idLength', encoding: 'ascii'})
+            .uint32('date', {length: 4})
             .uint32('payloadLength', {length: 4})
             // Needless to say the payload mustn't be loaded in memory in real life
             .buffer('payload', {length: 'payloadLength'})
@@ -88,6 +90,20 @@ class MessageV1Serializer {
         return Buffer.concat([lengthPrefix, idBuffer]);
     }
 
+    static _serializeDate(date) {
+        date = date || new Date();
+        const timestamp = Math.floor(date.getTime() / 1000);
+        if (timestamp < 0) {
+            throw new Error("Message date can't be before Unix epoch");
+        }
+        if (MAX_DATE_SIZE < timestamp) {
+            throw new Error("Date can't be represented with 32-bit unsigned integer");
+        }
+        const dateBuffer = Buffer.allocUnsafe(4);
+        dateBuffer.writeUInt32LE(timestamp);
+        return dateBuffer;
+    }
+
     static async _serializePayload(payload, recipientCertPath) {
         // TODO: Support "data" type (i.e., unencrypted payload)
         const ciphertext = await cms.encrypt(payload, recipientCertPath);
@@ -123,9 +139,10 @@ class MessageV1Serializer {
      * @param {string} senderKeyPath
      * @param {string} signatureHashAlgo
      * @param {string|null} id If absent, an id will be generated
+     * @param {Date|null} date When the message was created. Defaults to now.
      * @returns {Buffer}
      */
-    async serialize(payload, recipientCertPath, senderCert, senderKeyPath, signatureHashAlgo, id = null) {
+    async serialize(payload, recipientCertPath, senderCert, senderKeyPath, signatureHashAlgo, id = null, date = null) {
         const formatSignature = Buffer.allocUnsafe(10);
         formatSignature.write('Relaynet');
         formatSignature.writeUInt8(this._signature, 8);
@@ -136,6 +153,7 @@ class MessageV1Serializer {
             this.constructor._serializeRecipient(recipientCertPath),
             this.constructor._serializeSenderCert(senderCert),
             this.constructor._serializeId(id),
+            this.constructor._serializeDate(date),
             await this.constructor._serializePayload(payload, recipientCertPath),
         ]);
 
@@ -160,6 +178,7 @@ class MessageV1Serializer {
             ast.recipient,
             ast.senderCert,
             ast.id,
+            new Date(ast.date * 1000),
             ast.payload,
         );
     }

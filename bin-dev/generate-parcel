@@ -14,6 +14,7 @@ async function main(argv) {
         argv.senderKey,
         argv.signHashAlgo,
         argv.id,
+        argv.date && new Date(argv.date * 1000),
     ));
 }
 
@@ -43,7 +44,11 @@ const argv = yargs
     })
     .option('id', {
         requiresArg: true,
-        description: "The message's unique id",
+        description: "The parcel's unique id",
+    })
+    .option('date', {
+        requiresArg: true,
+        description: "The parcel's creation timestamp in UTC (defaults to now)",
     })
     .strict()
     .help()

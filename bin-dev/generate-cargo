@@ -34,7 +34,11 @@ function configureArgs(builder) {
         })
         .option('id', {
             requiresArg: true,
-            description: "The message's unique id",
+            description: "The cargo's unique id",
+        })
+        .option('date', {
+            requiresArg: true,
+            description: "The cargo's creation timestamp in UTC (defaults to now)",
         })
         .normalize('parcel')
     ;
@@ -51,6 +55,7 @@ async function main(argv) {
         argv.senderKey,
         argv.signHashAlgo,
         argv.id,
+        argv.date && new Date(argv.date * 1000),
     ));
 }
 
