@@ -9,11 +9,12 @@ const {decrypt} = require('./_cms');
  * In real life, this would be a *stream* (wrapping the payload).
  */
 class Message {
-    constructor(recipient, senderCert, id, date, payload) {
+    constructor(recipient, senderCert, id, date, ttl, payload) {
         this.recipient = recipient;
         this.senderCert = senderCert;
         this.id = id;
         this.date = date;
+        this.ttl = ttl;
         this.payload = payload;
     }
 

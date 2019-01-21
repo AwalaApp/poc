@@ -56,6 +56,7 @@ Sender certificate:
   Size: ${message.senderCert.length} octets
 Id: ${message.id}
 Date: ${message.date}
+TTL: ${message.ttl} seconds
 Payload:
   Size: ${message.payload.length} octets`;
 

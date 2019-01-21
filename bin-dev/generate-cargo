@@ -40,6 +40,11 @@ function configureArgs(builder) {
             requiresArg: true,
             description: "The cargo's creation timestamp in UTC (defaults to now)",
         })
+        .option('ttl', {
+            requiresArg: true,
+            description: "The cargo's TTL in seconds (defaults to 0)",
+            type: 'number',
+        })
         .normalize('parcel')
     ;
 }
@@ -56,6 +61,7 @@ async function main(argv) {
         argv.signHashAlgo,
         argv.id,
         argv.date && new Date(argv.date * 1000),
+        argv.ttl,
     ));
 }
 
