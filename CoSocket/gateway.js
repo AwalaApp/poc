@@ -6,37 +6,73 @@ const fs = require('fs');
 const net = require('net');
 const {serializeVarchar} = require('./_primitives');
 const {RelayerStream} = require('./_stream');
+const {CARGO_SERIALIZER, deserializeCargoPayload} = require('../messages/serialization');
 
-const _SOCKET_PATH = '/tmp/relayer-gateway.sock';
 const _INCOMING_CARGOES_DIR = '/tmp/incoming-cargoes';
 
-const server = net.createServer(function (client) {
-    const relayerClient = new RelayerStream(client);
-    relayerClient.on('data', function (cargo) {
-        const cargoFileName = crypto.randomBytes(16).toString("hex") + '.cargo';
-        const cargoFileStream = fs.createWriteStream(`${_INCOMING_CARGOES_DIR}/${cargoFileName}`);
-        cargoFileStream.on('finish', () => {
-            // This should call fdatasync() in real life
+function saveCargo(cargo, onFinish) {
+    const cargoFileName = crypto.randomBytes(16).toString("hex") + '.cargo';
+    const cargoFilePath = `${_INCOMING_CARGOES_DIR}/${cargoFileName}`;
+    const cargoFileStream = fs.createWriteStream(cargoFilePath);
 
-            if (!client.destroyed) {
-                client.write('c');
-                client.write(serializeVarchar(cargo.id));
-            }
-        });
-        cargo.stream.pipe(cargoFileStream);
+    cargoFileStream.on('finish', () => {
+        // This should call fdatasync() in the production-ready implementation
+
+        onFinish(cargoFilePath);
     });
-    relayerClient.init();
-});
 
-server.on('error', function (err) {
-    console.log('Error found; throwing it...');
-    throw err;
-});
+    cargo.stream.pipe(cargoFileStream);
+}
 
-if (fs.existsSync(_SOCKET_PATH)) {
-    fs.unlinkSync(_SOCKET_PATH);
+async function extractParcelsFromCargo(cargoFilePath, privateKeyPath) {
+    const cargo = await CARGO_SERIALIZER.deserialize(fs.readFileSync(cargoFilePath));
+
+    const cargoPayloadDecrypted = await cargo.decryptPayload(privateKeyPath);
+    return deserializeCargoPayload(cargoPayloadDecrypted);
 }
-if (!fs.existsSync(_INCOMING_CARGOES_DIR)) {
-    fs.mkdirSync(_INCOMING_CARGOES_DIR);
+
+function runServer(socketPath, privateKeyPath, parcelNotifier) {
+    if (fs.existsSync(socketPath)) {
+        fs.unlinkSync(socketPath);
+    }
+    if (!fs.existsSync(_INCOMING_CARGOES_DIR)) {
+        fs.mkdirSync(_INCOMING_CARGOES_DIR);
+    }
+
+    const server = net.createServer(function (client) {
+        const relayerClient = new RelayerStream(client);
+        relayerClient.on('data', function (cargo) {
+            // Cargoes are serialized with the Relaynet Abstract Message Format, which is meant to be validated
+            // on the fly, so we should take advantage of that in the production-ready implementation.
+
+            saveCargo(cargo, async function (cargoFilePath) {
+                if (!client.destroyed) {
+                    client.write('c');
+                    client.write(serializeVarchar(cargo.id));
+                }
+
+                const parcelSerializations = await extractParcelsFromCargo(cargoFilePath, privateKeyPath);
+
+                for (const parcelSerialized of parcelSerializations) {
+                    // Notify about receipt of parcel from Cargo Relay Network (CRN)
+                    parcelNotifier.emit('crn', parcelSerialized);
+                }
+
+                // Not need to keep the cargo if we got to this point
+                fs.unlinkSync(cargoFilePath);
+            });
+        });
+        relayerClient.init();
+    });
+
+    server.on('error', function (err) {
+        console.error('Error found; throwing it...');
+        throw err;
+    });
+
+    server.listen(socketPath);
 }
-server.listen(_SOCKET_PATH);
+
+module.exports = {
+    runServer,
+};
