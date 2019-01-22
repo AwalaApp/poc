@@ -2,7 +2,7 @@
 
 This directory contains scripts that were handy during the development of the PoC, and could also be handy early on in an eventual production-ready implementation.
 
-## Generating private keys and certificates
+## Generating keys for _private_ endpoints or gateways
 
 Use [`generate-private-node-cert`](generate-private-node-cert) to generate a private key with a corresponding certificate for an endpoint with an opaque address:
 
@@ -13,10 +13,34 @@ Use [`generate-private-node-cert`](generate-private-node-cert) to generate a pri
 The following will generate a private key with a corresponding certificate for a gateway with an opaque address:
 
 ```bash
-./generate-private-node-cert rngo /tmp/endpoint_cert.pem /tmp/endpoint_key.pem
+./generate-private-node-cert rngo /tmp/gateway_cert.pem /tmp/gateway_key.pem
 ```
 
-To generate a private key and a corresponding certificate for a _host endpoint_ or _host gateway_ (i.e., one whose address is a domain name or an IP address), follow the process you'd normally follow, but make sure the Relaynet address is specified in the `Subject Alternative Name` extension as a URI. For example, use `openssl` to generate a _Certificate Signing Request_ (CSR) and a private key, and send the CSR to a _Certificate Authority_ (CA).
+## Generating keys for _host_ endpoints or gateways
+
+Use [`generate-host-node-cert`](generate-host-node-cert) to generate a private key with a corresponding certificate for a _host_ endpoint:
+
+```bash
+./generate-host-node-cert rneh:api.example.com /tmp/endpoint_cert.pem /tmp/endpoint_key.pem
+```
+
+The following will generate a private key with a corresponding certificate for a _host_ gateway:
+
+```bash
+./generate-host-node-cert rngh:relayer.com /tmp/gateway_cert.pem /tmp/gateway_key.pem
+```
+
+If you want to use a parcel delivery or cargo relay _binding_ over TLS, you also have to generate a separate pair of keys for the server as usual. For example:
+
+```bash
+# Generate self-signed certificate for api.example.com
+openssl req -x509 -newkey \
+    rsa:4096 \
+    -subj '/CN=api.example.com' \
+    -keyout key.pem \
+    -out cert.pem \
+    -days 365
+```
 
 ## Generating and inspecting parcels
 

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Generate certificates for a host endpoint or gateway
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+ADDRESS="$1"
+CERT_PATH="$2"
+KEY_PATH="$3"
+
+openssl genrsa -out "${KEY_PATH}" 4096
+
+openssl req \
+    -new \
+    -x509 \
+    -days 365 \
+    -nodes \
+    -config <(cat <<EOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = SAN
+prompt = no
+
+[req_distinguished_name]
+C = GB
+
+[SAN]
+subjectAltName = URI:${ADDRESS}
+EOF
+) \
+    -key "${KEY_PATH}" \
+    -out "${CERT_PATH}"
+
+echo "Generated certificate for ${ADDRESS}"
