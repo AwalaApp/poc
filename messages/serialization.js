@@ -5,6 +5,7 @@ const BParser = require('binary-parser').Parser;
 const cms = require('./_cms');
 const fs = require('fs');
 const uuid4 = require('uuid4');
+const VError = require('verror');
 const {Cargo, Parcel} = require('./index');
 const {getAddressFromCert} = require('./utils');
 const {pemCertToDer} = require('./_asn1_utils');
@@ -186,7 +187,12 @@ class MessageV1Serializer {
     }
 
     async deserialize(buffer) {
-        const ast = this._parser.parse(buffer);
+        let ast;
+        try {
+            ast = this._parser.parse(buffer);
+        } catch (error) {
+            throw new VError(error, 'Buffer is not the expected type of RAMF message');
+        }
 
         // Verify signature and error out if it's invalid
         const signatureBlockLength = ast.signature.length + 2;

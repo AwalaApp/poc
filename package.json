@@ -28,6 +28,7 @@
     "tmp-promise": "^1.0.5",
     "twitter-lite": "^0.9.0",
     "uuid4": "^1.1.4",
+    "verror": "^1.10.0",
     "yargs": "^12.0.5"
   },
   "engines": {
