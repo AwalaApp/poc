@@ -14,8 +14,18 @@ const pogrpcPackageDefinition = grpcProtoLoader.loadSync(
 );
 const pogrpcPackage = grpc.loadPackageDefinition(pogrpcPackageDefinition).relaynet.pogrpc;
 
-function makeClient() {
-    return new pogrpcPackage.PogRPC('localhost:21473', grpc.credentials.createInsecure());
+/**
+ * Create a gRPC client to a PogRPC server.
+ *
+ * @param netloc
+ * @param {boolean|Buffer} tls Whether to use TLS, and if so, optionally which
+ *        self-signed cert to use
+ * @returns {grpc.Client}
+ */
+function makeClient(netloc = 'localhost:21473', tls = true) {
+    const cert = (Buffer.isBuffer(tls)) ? tls : null;
+    const credentials = (tls) ? grpc.credentials.createSsl(cert) : grpc.credentials.createInsecure();
+    return new pogrpcPackage.PogRPC(netloc, credentials);
 }
 
 function deliverParcels(parcels, client) {
@@ -42,6 +52,8 @@ function deliverParcels(parcels, client) {
                 resolve();
             }
         });
+
+        call.on('error', reject);
 
         call.on('end', function () {
             call.end();

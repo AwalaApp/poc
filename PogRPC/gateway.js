@@ -13,9 +13,9 @@ const pogrpcPackage = grpc.loadPackageDefinition(packageDefinition).relaynet.pog
 // Yup. This is the "database". And it's not even synchronized on disk. (It's a PoC!)
 const PARCELS_DB = {};
 
-function deliverParcels(call) {
+function deliverParcels(call, parcelNotifier) {
     call.on('data', function (parcelDelivery) {
-        PARCELS_DB[parcelDelivery.id] = parcelDelivery.parcel;
+        parcelNotifier.emit('pdn', parcelDelivery.parcel);
         call.write({id: parcelDelivery.id}); // ACK
     });
 
@@ -64,13 +64,15 @@ function collectParcels(call) {
     }, 2000);
 }
 
-function runServer(ip = '127.0.0.1', port = 21473) { // 21473? Too late!
+function runServer(netloc, parcelNotifier) {
     const server = new grpc.Server();
     server.addService(pogrpcPackage.PogRPC.service, {
-        deliverParcels,
+        deliverParcels(call) {
+            deliverParcels(call, parcelNotifier);
+        },
         collectParcels,
     });
-    server.bind(`${ip}:${port}`, grpc.ServerCredentials.createInsecure());
+    server.bind(netloc, grpc.ServerCredentials.createInsecure());
     server.start();
 }
 

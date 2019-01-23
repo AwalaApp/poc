@@ -2,6 +2,89 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-const {runServer} = require('../PogRPC/gateway');
+const cosocketGateway = require('../CoSocket/gateway');
+const EventEmitter = require('events');
+const fs = require('fs');
+const path = require('path');
+const pogrpcEndpoint = require('../PogRPC/endpoint');
+const pogrpcGateway = require('../PogRPC/gateway');
+const {getAddressFromCert} = require('../messages/utils');
+const {PARCEL_SERIALIZER} = require('../messages/serialization');
 
-runServer();
+// This gateway is reusing the asymmetric keys for parcel delivery and cargo relay *for expediency*
+// in the context of this PoC.
+const CERT_PATH = path.normalize(__dirname + '/../config/relayer-gateway.cert.pem');
+const KEY_PATH = path.normalize(__dirname + '/../config/relayer-gateway.key.pem');
+
+const COSOCKET_SOCKET_PATH = '/tmp/relayer-gateway.sock';
+const POGRPC_NETLOC = '127.0.0.1:21473'; // 21473? Too late!
+
+// We're whitelisting the self-signed cert for the API endpoint's gRPC server for
+// expediency, but this MUST NOT be done in a production-ready implementation.
+const TWITTER_API_ENDPOINT_SERVER_CERT = fs.readFileSync(__dirname + '/../config/twitter-endpoint-server.cert.pem');
+
+function main() {
+    const gatewayOpaqueAddress = getAddressFromCert(fs.readFileSync(CERT_PATH));
+
+    const parcelNotifier = new EventEmitter();
+    parcelNotifier.on('crn', deliverCrnParcel);
+    parcelNotifier.on('pdn', deliverPndParcel);
+
+    cosocketGateway.runServer(COSOCKET_SOCKET_PATH, KEY_PATH, parcelNotifier);
+    pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier);
+
+    console.log(`Running relayer's gateway ${gatewayOpaqueAddress}
+CoSocket listening on ${COSOCKET_SOCKET_PATH}
+PogRPC listening on ${POGRPC_NETLOC}
+`);
+}
+
+/**
+ * Deliver parcel (received through CRN) to its corresponding _host_ endpoint.
+ *
+ * This function is called for each parcel contained in a cargo relayed to the this gateway.
+ *
+ * CRN = Cargo Relay Network (the network established by a gateway and its relayers). Also, "host endpoint"
+ * is an endpoint listening on a network address (using a parcel delivery binding like PogRPC), as opposed
+ * to a private endpoint (which has an opaque address).
+ *
+ * The production-ready equivalent of this function would be different in multiple ways. For example:
+ *
+ * - It should support multiple parcel delivery bindings, not just PogRPC.
+ * - Whatever the binding, it should _queue_ the delivery, not do it in band.
+ * - It should support parcels sent to private endpoints (those with opaque addresses). This is necessary
+ *   if the gateway is serving an individual user (and their private endpoints), but it's unlikely to be
+ *   necessary when the gateway is serving a relayer (unless the relayer chooses to expose private endpoints).
+ *
+ * @param parcelSerialization
+ * @returns {Promise<void>}
+ */
+async function deliverCrnParcel(parcelSerialization) {
+    const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
+    const {scheme, address} = recipient.match(/^(?<scheme>[\w+]+):(?<address>.+)$/).groups;
+
+    if (scheme !== 'rneh') {
+        console.error(`Can only deliver parcels to host endpoints. Parcel ${id}  for ${recipient} will be ignored.`);
+        return;
+
+        // This is just a limitation in the PoC. A relayer might choose to expose
+        // its own private endpoints to the remote endpoints it supports.
+    }
+
+    // NB: This PoC assumes the host endpoint only supports PogRPC, when in fact it
+    // should use Application-Layer Protocol Negotiation to determine which PND
+    // binding to use.
+
+    const pogrpcClient = pogrpcEndpoint.makeClient(
+        address,
+        TWITTER_API_ENDPOINT_SERVER_CERT, // Don't do in production
+    );
+    await pogrpcEndpoint.deliverParcels([parcelSerialization], pogrpcClient);
+}
+
+async function deliverPndParcel(parcelSerialization) {
+    // const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
+    throw new Error('unimplemented!')
+}
+
+main();
