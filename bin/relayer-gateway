@@ -13,15 +13,15 @@ const {PARCEL_SERIALIZER} = require('../messages/serialization');
 
 // This gateway is reusing the asymmetric keys for parcel delivery and cargo relay *for expediency*
 // in the context of this PoC.
-const CERT_PATH = path.normalize(__dirname + '/../config/relayer-gateway.cert.pem');
-const KEY_PATH = path.normalize(__dirname + '/../config/relayer-gateway.key.pem');
+const CERT_PATH = path.normalize(__dirname + '/../certs/relayer-gateway.cert.pem');
+const KEY_PATH = path.normalize(__dirname + '/../certs/relayer-gateway.key.pem');
 
 const COSOCKET_SOCKET_PATH = '/tmp/relayer-gateway.sock';
 const POGRPC_NETLOC = '127.0.0.1:21473'; // 21473? Too late!
 
 // We're whitelisting the self-signed cert for the API endpoint's gRPC server for
 // expediency, but this MUST NOT be done in a production-ready implementation.
-const TWITTER_API_ENDPOINT_SERVER_CERT = fs.readFileSync(__dirname + '/../config/twitter-endpoint-server.cert.pem');
+const TWITTER_API_ENDPOINT_SERVER_CERT = fs.readFileSync(__dirname + '/../certs/twitter-endpoint-server.cert.pem');
 
 function main() {
     const gatewayOpaqueAddress = getAddressFromCert(fs.readFileSync(CERT_PATH));
