@@ -6,7 +6,7 @@ const cosocketGateway = require('../CoSocket/gateway');
 const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
-const pogrpcEndpoint = require('../PogRPC/endpoint');
+const pogrpcGatewayClient = require('../PogRPC/gateway_client');
 const pogrpcGateway = require('../PogRPC/gateway');
 const {getAddressFromCert} = require('../messages/utils');
 const {PARCEL_SERIALIZER} = require('../messages/serialization');
@@ -75,11 +75,11 @@ async function deliverCrnParcel(parcelSerialization) {
     // should use Application-Layer Protocol Negotiation to determine which PND
     // binding to use.
 
-    const pogrpcClient = pogrpcEndpoint.makeClient(
+    const gatewayClient = pogrpcGatewayClient.makeClient(
         address,
         TWITTER_API_ENDPOINT_SERVER_CERT, // Don't do in production
     );
-    await pogrpcEndpoint.deliverParcels([parcelSerialization], pogrpcClient);
+    await pogrpcGatewayClient.deliverParcels([parcelSerialization], gatewayClient);
 }
 
 async function deliverPndParcel(parcelSerialization) {
