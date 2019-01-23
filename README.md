@@ -44,6 +44,7 @@ See [bin-dev/](bin-dev/).
 
 ## How to set up
 
+1. Make sure Node.js v10 and OpenSSL are available in your `$PATH`.
 1. Map `twitter-3rd-party-endpoint.example.com` to the local loopback (`127.0.0.1`). On Linux this can be done by adding an entry to `/etc/hosts`.
 1. Add a `.env` file to the root of the repo with the following content:
 ```
