@@ -41,3 +41,17 @@ Similar to the example above, but using an adapter run by a third party (so not 
 ## Development tools
 
 See [bin-dev/](bin-dev/).
+
+## How to set up
+
+1. Map `twitter-3rd-party-endpoint.example.com` to the local loopback (`127.0.0.1`). On Linux this can be done by adding an entry to `/etc/hosts`.
+1. Add a `.env` file to the root of the repo with the following content:
+```
+# From the Twitter OAuth app
+TWITTER_CONSUMER_KEY='<your-consumer-key>'
+TWITTER_CONSUMER_SECRET='<your-consumer-secret>'
+
+# From the Twitter client
+TWITTER_ACCESS_TOKEN_KEY='<your-access-token-key>'
+TWITTER_ACCESS_TOKEN_SECRET='<your-access-token-secret>'
+```
