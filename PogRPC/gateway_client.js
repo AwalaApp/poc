@@ -21,7 +21,7 @@ const pogrpcPackage = grpc.loadPackageDefinition(pogrpcPackageDefinition).relayn
  *        self-signed cert to use
  * @returns {grpc.Client}
  */
-function makeClient(netloc = 'localhost:21473', tls = true) {
+function makeClient(netloc, tls = true) {
     const cert = (Buffer.isBuffer(tls)) ? tls : null;
     const credentials = (tls) ? grpc.credentials.createSsl(cert) : grpc.credentials.createInsecure();
     return new pogrpcPackage.PogRPC(netloc, credentials);

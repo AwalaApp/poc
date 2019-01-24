@@ -161,7 +161,7 @@ class MessageV1Serializer {
      * @param {number} ttl Time to live
      * @returns {Buffer}
      */
-    async serialize(payload, recipientCertPath, senderCert, senderKeyPath, signatureHashAlgo, id = null, date = null, ttl = 0) {
+    async serialize(payload, recipientCertPath, senderCert, senderKeyPath, signatureHashAlgo = 'sha256', id = null, date = null, ttl = 0) {
         const formatSignature = Buffer.allocUnsafe(10);
         formatSignature.write('Relaynet');
         formatSignature.writeUInt8(this._signature, 8);

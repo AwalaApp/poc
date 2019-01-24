@@ -1,7 +1,7 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-// PogRPC Endpoint for Node.js.
+// PogRPC host endpoint.
 
 const grpc = require('grpc');
 const grpcProtoLoader = require('@grpc/proto-loader');

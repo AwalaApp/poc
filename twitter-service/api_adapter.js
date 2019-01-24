@@ -2,7 +2,7 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const Twitter = require('twitter-lite');
-const pogrpcEndpoint = require('../PogRPC/endpoint');
+const pogrpcEndpoint = require('../PogRPC/host_endpoint');
 const {TweetMessage} = require('./messages');
 
 require('dotenv').config();

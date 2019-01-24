@@ -1,0 +1,64 @@
+#!/usr/bin/env node
+'use strict';
+// This is a proof of concept. The code below is ugly, inefficient and has no tests.
+
+const Endpoint = require('../messages/endpoint');
+const pogrpcGatewayClient = require('../PogRPC/gateway_client');
+const readline = require('readline');
+const TwitterClient = require('../twitter-service/client');
+
+require('dotenv').config();
+
+const CERT_PATH = __dirname + '/../certs/twitter-client.cert.pem';
+const KEY_PATH = __dirname + '/../certs/twitter-client.key.pem';
+
+const GATEWAY_ADDRESS = '127.0.0.1:1473';
+
+async function main() {
+    const gatewayClient = pogrpcGatewayClient.makeClient(GATEWAY_ADDRESS, false);
+    const endpoint = new Endpoint(CERT_PATH, KEY_PATH, gatewayClient);
+    const twitterClient = new TwitterClient(
+        process.env.TWITTER_ACCESS_TOKEN_KEY,
+        process.env.TWITTER_ACCESS_TOKEN_SECRET,
+        endpoint,
+    );
+
+    const collectedTweets = await twitterClient.collectMessages();
+    await printCollectedTweets(collectedTweets);
+
+    console.log('');
+
+    const tweetStatus = await promptTweet();
+    if (tweetStatus) {
+        await twitterClient.postTweet({status: tweetStatus});
+        console.log('✔️ Tweet added to queue.')
+    }
+}
+
+function promptTweet() {
+    const rlInterface = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+    return new Promise((resolve) => {
+        rlInterface.question('What would you like to tweet? (optional)\n', (tweetStatus) => {
+            rlInterface.close();
+            resolve(tweetStatus || null);
+        });
+    });
+}
+
+async function printCollectedTweets(tweetMessages) {
+    console.log('New Tweets:');
+    let anyTweet = false;
+    for (const tweetMessage of tweetMessages) {
+        console.log(`- ${tweetMessage.author} said: ${tweetMessage.status}`);
+        anyTweet = true;
+    }
+
+    if (!anyTweet) {
+        console.log('(no new tweets)')
+    }
+}
+
+(async () => await main())();
