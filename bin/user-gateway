@@ -1,0 +1,90 @@
+#!/usr/bin/env node
+'use strict';
+// This is a proof of concept. The code below is ugly, inefficient and has no tests.
+
+const cosocketGateway = require('../CoSocket/gateway');
+const EventEmitter = require('events');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const pogrpcGateway = require('../PogRPC/gateway');
+const {createHash} = require('crypto');
+const {getAddressFromCert} = require('../messages/utils');
+const {PARCEL_SERIALIZER} = require('../messages/serialization');
+
+// This gateway is reusing the asymmetric keys for parcel delivery and cargo relay *for expediency*
+// in the context of this PoC.
+const CERT_PATH = path.normalize(__dirname + '/../certs/user-gateway.cert.pem');
+const KEY_PATH = path.normalize(__dirname + '/../certs/user-gateway.key.pem');
+
+const DATA_DIR_PATH = path.join(os.tmpdir(), 'user-gateway-data');
+
+const COSOCKET_SOCKET_PATH = path.join(DATA_DIR_PATH, 'cosocket.sock');
+const POGRPC_NETLOC = '127.0.0.1:1473'; // 1473? Too late!
+
+const PDN_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'pdn-parcels');
+
+function main() {
+    mkdir(DATA_DIR_PATH);
+    mkdir(PDN_PARCELS_DIR_PATH);
+
+    const gatewayOpaqueAddress = getAddressFromCert(fs.readFileSync(CERT_PATH));
+
+    const parcelNotifier = new EventEmitter();
+    parcelNotifier.on('crn', deliverCrnParcel);
+    parcelNotifier.on('pdn', deliverPndParcel);
+
+    cosocketGateway.runServer(COSOCKET_SOCKET_PATH, KEY_PATH, parcelNotifier);
+    pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier);
+
+    console.log(`Running user's gateway ${gatewayOpaqueAddress}
+CoSocket listening on ${COSOCKET_SOCKET_PATH}
+PogRPC listening on ${POGRPC_NETLOC}
+`);
+}
+
+/**
+ * Deliver parcel (received through CRN) to its corresponding _host_ endpoint.
+ *
+ * This function is called for each parcel contained in a cargo relayed to the this gateway.
+ *
+ * CRN = Cargo Relay Network (the network established by a gateway and its relayers). Also, "host endpoint"
+ * is an endpoint listening on a network address (using a parcel delivery binding like PogRPC), as opposed
+ * to a private endpoint (which has an opaque address).
+ *
+ * The production-ready equivalent of this function would be different in multiple ways. For example:
+ *
+ * - It should support multiple parcel delivery bindings, not just PogRPC.
+ * - Whatever the binding, it should _queue_ the delivery, not do it in band.
+ * - It should support parcels sent to private endpoints (those with opaque addresses). This is necessary
+ *   if the gateway is serving an individual user (and their private endpoints), but it's unlikely to be
+ *   necessary when the gateway is serving a relayer (unless the relayer chooses to expose private endpoints).
+ *
+ * @param parcelSerialization
+ * @returns {Promise<void>}
+ */
+async function deliverCrnParcel(parcelSerialization) {
+    const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
+    console.log(`Received parcel ${id} for ${recipient} via CRN`);
+}
+
+async function deliverPndParcel(parcelSerialization) {
+    const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
+
+    const hash = createHash('sha256');
+    hash.update(parcel.senderCert);
+    hash.update(parcel.id);
+    const internalParcelId = hash.digest('hex');
+
+    const parcelPath = path.join(PDN_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
+    fs.writeFileSync(parcelPath, parcelSerialization);
+    console.log(`Saved parcel ${parcel.id} to ${parcelPath}`);
+}
+
+function mkdir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath);
+    }
+}
+
+main();
