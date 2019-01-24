@@ -5,7 +5,7 @@
 
 const grpc = require('grpc');
 const grpcProtoLoader = require('@grpc/proto-loader');
-const {PARCEL_SERIALIZER} = require('../messages/serialization');
+const {PARCEL_SERIALIZER} = require('../core/serialization');
 
 const pogrpcPackageDefinition = grpcProtoLoader.loadSync(
     __dirname + '/pogrpc.proto',

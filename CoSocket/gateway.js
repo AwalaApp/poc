@@ -6,7 +6,7 @@ const fs = require('fs');
 const net = require('net');
 const {serializeVarchar} = require('./_primitives');
 const {RelayerStream} = require('./_stream');
-const {CARGO_SERIALIZER, deserializeCargoPayload} = require('../messages/serialization');
+const {CARGO_SERIALIZER, deserializeCargoPayload} = require('../core/serialization');
 
 const _INCOMING_CARGOES_DIR = '/tmp/incoming-cargoes';
 

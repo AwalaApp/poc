@@ -6,8 +6,8 @@ const cms = require('./_cms');
 const fs = require('fs');
 const uuid4 = require('uuid4');
 const VError = require('verror');
-const {Cargo, Parcel} = require('./index');
-const {getAddressFromCert} = require('./utils');
+const {Cargo, Parcel} = require('./messages');
+const {getAddressFromCert} = require('./pki');
 const {pemCertToDer} = require('./_asn1_utils');
 
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer
@@ -18,7 +18,9 @@ const MAX_PAYLOAD_SIZE = (2 ** 32) - 1; // 32-bit, unsigned integer
 const MAX_SIGNATURE_SIZE = (2 ** 12) - 1; // 12-bit, unsigned integer
 
 /**
- * Serializer for Relaynet Abstract Message Format v1
+ * Serializer for Relaynet Abstract Message Format v1 (per RS-001).
+ *
+ * See RS-001: https://github.com/relaynet/specs/blob/master/rs001-ramf.md
  *
  * The final implementation should probably use https://kaitai.io
  */

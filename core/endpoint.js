@@ -4,7 +4,7 @@
 // Binding-agnostic endpoint for applications acting as clients (as opposed to hosts).
 
 const fs = require('fs');
-const {getAddressFromCert} = require('./utils');
+const {getAddressFromCert} = require('./pki');
 const {PARCEL_SERIALIZER} = require('./serialization');
 
 class ClientEndpoint {

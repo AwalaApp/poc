@@ -1,6 +1,8 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
+// Utilities to support RS-002 (https://github.com/relaynet/specs/blob/master/rs002-rpki.md)
+
 const assert = require('assert').strict;
 const {certificateFromPem} = require('node-forge').pki;
 

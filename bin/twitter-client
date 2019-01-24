@@ -2,7 +2,7 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-const Endpoint = require('../messages/endpoint');
+const Endpoint = require('../core/endpoint');
 const PogRPCGatewayClient = require('../PogRPC/gateway_client');
 const readline = require('readline');
 const TwitterClient = require('../twitter-service/client');

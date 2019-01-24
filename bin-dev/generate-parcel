@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const yargs = require('yargs');
-const {PARCEL_SERIALIZER} = require('../messages/serialization');
+const {PARCEL_SERIALIZER} = require('../core/serialization');
 
 async function main(argv) {
     process.stdout.write(await PARCEL_SERIALIZER.serialize(

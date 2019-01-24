@@ -9,8 +9,8 @@ const os = require('os');
 const path = require('path');
 const pogrpcGateway = require('../PogRPC/gateway');
 const {createHash} = require('crypto');
-const {getAddressFromCert} = require('../messages/utils');
-const {PARCEL_SERIALIZER} = require('../messages/serialization');
+const {getAddressFromCert} = require('../core/pki');
+const {PARCEL_SERIALIZER} = require('../core/serialization');
 
 // This gateway is reusing the asymmetric keys for parcel delivery and cargo relay *for expediency*
 // in the context of this PoC.
