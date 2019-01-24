@@ -4,7 +4,6 @@
 // Binding-agnostic endpoint for applications acting as clients (as opposed to hosts).
 
 const fs = require('fs');
-const gatewayClient = require('../PogRPC/gateway_client');  // TODO: REMOVE
 const {getAddressFromCert} = require('./utils');
 const {PARCEL_SERIALIZER} = require('./serialization');
 
@@ -29,11 +28,11 @@ class ClientEndpoint {
             date,
             ttl,
         );
-        await gatewayClient.deliverParcels([parcel], this._gatewayClient);
+        await this._gatewayClient.deliverParcels([parcel]);
     }
 
     async* collectMessages() {
-        const parcelSerializations = gatewayClient.collectParcels(this._gatewayClient);
+        const parcelSerializations = this._gatewayClient.collectParcels();
         for (const parcelSerialized of parcelSerializations) {
             const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
 

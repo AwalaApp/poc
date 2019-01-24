@@ -11,99 +11,94 @@ const pogrpcPackageDefinition = grpcProtoLoader.loadSync(
     __dirname + '/pogrpc.proto',
     {keepCase: true},
 );
-const pogrpcPackage = grpc.loadPackageDefinition(pogrpcPackageDefinition).relaynet.pogrpc;
+const PogRPCService = grpc.loadPackageDefinition(pogrpcPackageDefinition).relaynet.pogrpc.PogRPC;
 
-/**
- * Create a gRPC client to a PogRPC server.
- *
- * @param netloc
- * @param {boolean|Buffer} tls Whether to use TLS, and if so, optionally which
- *        self-signed cert to use
- * @returns {grpc.Client}
- */
-function makeClient(netloc, tls = true) {
-    const cert = (Buffer.isBuffer(tls)) ? tls : null;
-    const credentials = (tls) ? grpc.credentials.createSsl(cert) : grpc.credentials.createInsecure();
-    return new pogrpcPackage.PogRPC(netloc, credentials);
-}
+class GatewayClient {
 
-function deliverParcels(parcels, client) {
-    // The final implementation should actually work with streams instead of loading everything in
-    // memory and doing so much stuff synchronously.
+    /**
+     * @param netloc
+     * @param {boolean|Buffer} tls Whether to use TLS, and if so, optionally which self-signed cert to use
+     */
+    constructor(netloc, tls = true) {
+        const cert = (Buffer.isBuffer(tls)) ? tls : null;
+        const credentials = (tls) ? grpc.credentials.createSsl(cert) : grpc.credentials.createInsecure();
+        this._grpcClient = new PogRPCService(netloc, credentials);
+    }
 
-    const sentParcelIds = new Set();
-    let allParcelsSent = false;
+    deliverParcels(parcels) {
+        // The final implementation should actually work with streams instead of loading everything in
+        // memory and doing so much stuff synchronously.
 
-    return new Promise((resolve, reject) => {
-        const call = client.deliverParcels();
+        const sentParcelIds = new Set();
+        let allParcelsSent = false;
 
-        call.on('data', function (deliveryAck) {
-            if (!sentParcelIds.has(deliveryAck.id)) {
+        return new Promise((resolve, reject) => {
+            const call = this._grpcClient.deliverParcels();
+
+            call.on('data', function (deliveryAck) {
+                if (!sentParcelIds.has(deliveryAck.id)) {
+                    call.end();
+                    reject(new Error(`Got ACK for unknown parcel (${deliveryAck.id})`));
+                    return;
+                }
+
+                sentParcelIds.delete(deliveryAck.id);
+
+                if (sentParcelIds.size === 0 && allParcelsSent) {
+                    call.end();
+                    resolve();
+                }
+            });
+
+            call.on('error', reject);
+
+            call.on('end', function () {
                 call.end();
-                reject(new Error(`Got ACK for unknown parcel (${deliveryAck.id})`));
-                return;
+            });
+
+            for (let parcel of parcels) {
+                const parcelId = createHash('sha1').update(parcel).digest('hex');
+                call.write({id: parcelId, parcel});
+                sentParcelIds.add(parcelId);
             }
+            allParcelsSent = true;
 
-            sentParcelIds.delete(deliveryAck.id);
-
-            if (sentParcelIds.size === 0 && allParcelsSent) {
+            setTimeout(() => {
                 call.end();
-                resolve();
-            }
+                reject(new Error('Timed out'));
+                // This should be propagated to the app in the final implementation so
+                // it can queue a retry for the unacknowledged parcels if necessary
+            }, 2000);
         });
+    }
 
-        call.on('error', reject);
+    collectParcels() {
+        // The final implementation should actually work with streams instead of loading everything in
+        // memory and doing so much stuff synchronously.
+        const receivedParcels = [];
 
-        call.on('end', function () {
-            call.end();
+        return new Promise(function (resolve, reject) {
+            const call = this._grpcClient.collectParcels();
+
+            call.on('data', function (parcelDelivery) {
+                receivedParcels.push(parcelDelivery.parcel);
+
+                // The final implementation probably shouldn't send the ACK until the app
+                // has received and processed the parcel.
+                call.write({id: parcelDelivery.id});
+            });
+
+            call.on('end', function () {
+                call.end();
+                resolve(receivedParcels);
+            });
+
+            call.on('error', function (error) {
+                reject(error);
+                call.end();
+            });
         });
-
-        for (let parcel of parcels) {
-            const parcelId = createHash('sha1').update(parcel).digest('hex');
-            call.write({id: parcelId, parcel});
-            sentParcelIds.add(parcelId);
-        }
-        allParcelsSent = true;
-
-        setTimeout(() => {
-            call.end();
-            reject(new Error('Timed out'));
-            // This should be propagated to the app in the final implementation so
-            // it can queue a retry for the unacknowledged parcels if necessary
-        }, 2000);
-    });
+    }
 }
 
-function collectParcels(client) {
-    // The final implementation should actually work with streams instead of loading everything in
-    // memory and doing so much stuff synchronously.
-    const receivedParcels = [];
-
-    return new Promise(function (resolve, reject) {
-        const call = client.collectParcels();
-
-        call.on('data', function (parcelDelivery) {
-            receivedParcels.push(parcelDelivery.parcel);
-
-            // The final implementation probably shouldn't send the ACK until the app
-            // has received and processed the parcel.
-            call.write({id: parcelDelivery.id});
-        });
-
-        call.on('end', function () {
-            call.end();
-            resolve(receivedParcels);
-        });
-
-        call.on('error', function (error) {
-            reject(error);
-            call.end();
-        });
-    });
-}
-
-module.exports = {
-    makeClient,
-    deliverParcels,
-    collectParcels,
-};
+module.exports = GatewayClient;

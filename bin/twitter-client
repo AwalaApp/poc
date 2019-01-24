@@ -3,7 +3,7 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const Endpoint = require('../messages/endpoint');
-const pogrpcGatewayClient = require('../PogRPC/gateway_client');
+const PogRPCGatewayClient = require('../PogRPC/gateway_client');
 const readline = require('readline');
 const TwitterClient = require('../twitter-service/client');
 
@@ -15,7 +15,7 @@ const KEY_PATH = __dirname + '/../certs/twitter-client.key.pem';
 const GATEWAY_ADDRESS = '127.0.0.1:1473';
 
 async function main() {
-    const gatewayClient = pogrpcGatewayClient.makeClient(GATEWAY_ADDRESS, false);
+    const gatewayClient = new PogRPCGatewayClient(GATEWAY_ADDRESS, false);
     const endpoint = new Endpoint(CERT_PATH, KEY_PATH, gatewayClient);
     const twitterClient = new TwitterClient(
         process.env.TWITTER_ACCESS_TOKEN_KEY,
@@ -50,7 +50,7 @@ function promptTweet() {
 
 async function printCollectedTweets(tweetMessages) {
     console.log('New Tweets:');
-    let anyTweet = false;
+    let anyTweet;
     for (const tweetMessage of tweetMessages) {
         console.log(`- ${tweetMessage.author} said: ${tweetMessage.status}`);
         anyTweet = true;
