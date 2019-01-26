@@ -155,7 +155,7 @@ class MessageV1Serializer {
     /**
      * @param payload
      * @param {string} recipientCertPath Path to the recipient's X.509. Should be a buffer in "real life".
-     * @param {string} senderCert
+     * @param {Buffer} senderCert
      * @param {string} senderKeyPath
      * @param {string} signatureHashAlgo
      * @param {string|null} id If absent, an id will be generated
