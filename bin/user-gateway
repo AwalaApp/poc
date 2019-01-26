@@ -2,7 +2,7 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-const cosocketGateway = require('../CoSocket/gateway');
+const cosocketServer = require('../CoSocket/server');
 const EventEmitter = require('events');
 const fs = require('fs');
 const os = require('os');
@@ -17,29 +17,39 @@ const {PARCEL_SERIALIZER} = require('../core/serialization');
 const CERT_PATH = path.normalize(__dirname + '/../certs/user-gateway.cert.pem');
 const KEY_PATH = path.normalize(__dirname + '/../certs/user-gateway.key.pem');
 
-const DATA_DIR_PATH = path.join(os.tmpdir(), 'user-gateway-data');
+const ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
 
+const DATA_DIR_PATH = path.join(os.tmpdir(), 'user-gateway-data');
 const COSOCKET_SOCKET_PATH = path.join(DATA_DIR_PATH, 'cosocket.sock');
+
 const POGRPC_NETLOC = '127.0.0.1:1473'; // 1473? Too late!
 
 const PDN_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'pdn-parcels');
+const CRN_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'crn-parcels');
+
+const RELAYER_GW_CERT_PATH = path.normalize(__dirname + '/../certs/relayer-gateway.cert.pem');
+const RELAYER_GW_ADDRESS = getAddressFromCert(fs.readFileSync(RELAYER_GW_CERT_PATH));
 
 function main() {
-    mkdir(DATA_DIR_PATH);
-    mkdir(PDN_PARCELS_DIR_PATH);
-
-    const gatewayOpaqueAddress = getAddressFromCert(fs.readFileSync(CERT_PATH));
+    fs.mkdirSync(DATA_DIR_PATH, {recursive: true});
+    fs.mkdirSync(CRN_PARCELS_DIR_PATH, {recursive: true});
 
     const parcelNotifier = new EventEmitter();
     parcelNotifier.on('crn', deliverCrnParcel);
     parcelNotifier.on('pdn', deliverPndParcel);
+    parcelNotifier.on('crnCollection', ackCrnParcelCollection);
 
-    cosocketGateway.runServer(COSOCKET_SOCKET_PATH, KEY_PATH, parcelNotifier);
+    cosocketServer(COSOCKET_SOCKET_PATH, CERT_PATH, KEY_PATH, parcelNotifier, fetchCargoesPayloads);
     pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier);
 
-    console.log(`Running user's gateway ${gatewayOpaqueAddress}
-CoSocket listening on ${COSOCKET_SOCKET_PATH}
-PogRPC listening on ${POGRPC_NETLOC}
+    console.log(`Running user's gateway ${ADDRESS}
+
+CRN:
+ * Binding: CoSocket (${COSOCKET_SOCKET_PATH})
+ * Relayer gateway address: ${RELAYER_GW_ADDRESS}
+
+PDN:
+ * Binding: PogRPC (${POGRPC_NETLOC})
 `);
 }
 
@@ -65,7 +75,8 @@ PogRPC listening on ${POGRPC_NETLOC}
  */
 async function deliverCrnParcel(parcelSerialization) {
     const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
-    console.log(`Received parcel ${id} for ${recipient} via CRN`);
+    console.log(`[CRN] Received parcel ${id} for ${recipient}`);
+    throw new Error('unimplemented');
 }
 
 async function deliverPndParcel(parcelSerialization) {
@@ -76,15 +87,56 @@ async function deliverPndParcel(parcelSerialization) {
     hash.update(parcel.id);
     const internalParcelId = hash.digest('hex');
 
-    const parcelPath = path.join(PDN_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
+    const parcelPath = path.join(CRN_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
     fs.writeFileSync(parcelPath, parcelSerialization);
-    console.log(`Saved parcel ${parcel.id} to ${parcelPath}`);
+    console.log(`[PDN] Added parcel ${parcel.id} to CRN queue.`);
 }
 
-function mkdir(dirPath) {
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath);
+/**
+ * Return all the parcels that should be relayed in a single cargo.
+ *
+ * In production, the equivalent of this function MUST yield multiple values if the parcels could not
+ * fit in one cargo.
+ *
+ * The function is a generator and takes the target gateway addresses as input because the generic code
+ * in the CRN server should be agnostic of the storage medium. This implementation uses the file system,
+ * but a relayer's gateway could use S3 or a DB to store the parcels, for example.
+ *
+ * @param {Array<string>} gatewayAddresses
+ * @returns {AsyncIterableIterator<{gatewayAddress: string, parcels}>}
+ */
+async function* fetchCargoesPayloads(gatewayAddresses) {
+    // Because this is the user's gateway, the relayer's gateway is the only recipient of the cargo.
+    // Any other target gateway is ignored.
+    if (!gatewayAddresses.includes(RELAYER_GW_ADDRESS)) {
+        console.warn("[CRN] Ignoring parcel collection request because it isn't for our relayer");
+        return;
     }
+
+    const parcelFileNames = fs.readdirSync(CRN_PARCELS_DIR_PATH).map(f => path.join(CRN_PARCELS_DIR_PATH, f));
+
+    if (parcelFileNames.length === 0) {
+        return;
+    }
+
+    const parcels = {};
+    for (const parcelFileName of parcelFileNames) {
+        // Use fs.createReadStream() in production.
+        parcels[parcelFileName] = fs.readFileSync(parcelFileName);
+    }
+    yield {gatewayAddress: RELAYER_GW_ADDRESS, parcels};
+}
+
+function ackCrnParcelCollection(parcelId) {
+    // In this case, the parcelId is the path on disk, but it could be an S3 object URL
+    // or a DB PK (if the parcel is stored in a DB), for example. This scenario is likely
+    // with a relayer gateway.
+
+    // We should check that the path actually corresponds to a collected parcel in
+    // production.
+
+    console.log(`[CRN] Cargo containing parcel ${parcelId} was collected. The parcel will be removed.`);
+    fs.unlinkSync(parcelId);
 }
 
 main();
