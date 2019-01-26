@@ -28,6 +28,7 @@ function processTweet(message) {
     });
     twitterClient
         .post('statuses/update', {status: tweetMsg.status})
+        .then(() => console.log('Successfully posted tweet'))
         .catch((error) => {
             // TODO: Send error message to origin endpoint.
             console.log('Could not post tweet', error);
