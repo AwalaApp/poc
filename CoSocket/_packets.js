@@ -1,7 +1,7 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-class Cargo {
+class CargoDelivery {
     constructor(id, size, stream) {
         this.id = id;
         this.size = size;
@@ -10,5 +10,5 @@ class Cargo {
 }
 
 module.exports = {
-    Cargo
+    CargoDelivery,
 };

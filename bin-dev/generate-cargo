@@ -7,6 +7,22 @@ const fs = require('fs');
 const yargs = require('yargs');
 const {CARGO_SERIALIZER, serializeCargoPayload} = require('../core/serialization');
 
+async function main(argv) {
+    const parcelPaths = argv.parcel || [];
+    assert(parcelPaths.length, 'One or more parcels must be passed');
+    const parcels = parcelPaths.map(p => fs.readFileSync(p));
+    process.stdout.write(await CARGO_SERIALIZER.serialize(
+        serializeCargoPayload(...parcels),
+        argv.recipientCert,
+        fs.readFileSync(argv.senderCert),
+        argv.senderKey,
+        argv.signHashAlgo,
+        argv.id,
+        argv.date && new Date(argv.date * 1000),
+        argv.ttl,
+    ));
+}
+
 function configureArgs(builder) {
     builder
         .option('recipient-cert', {
@@ -46,22 +62,6 @@ function configureArgs(builder) {
         })
         .normalize('parcel')
     ;
-}
-
-async function main(argv) {
-    const parcelPaths = argv.parcel || [];
-    assert(parcelPaths.length, 'One or more parcels must be passed');
-    const parcels = parcelPaths.map(p => fs.readFileSync(p));
-    process.stdout.write(await CARGO_SERIALIZER.serialize(
-        serializeCargoPayload(...parcels),
-        argv.recipientCert,
-        fs.readFileSync(argv.senderCert),
-        argv.senderKey,
-        argv.signHashAlgo,
-        argv.id,
-        argv.date && new Date(argv.date * 1000),
-        argv.ttl,
-    ));
 }
 
 yargs
