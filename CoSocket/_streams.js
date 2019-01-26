@@ -2,7 +2,7 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const {CargoDelivery} = require('./_packets');
-const {deserializeVarbigint, serializeVarbigint, serializeVarchar} = require('./_primitives');
+const {deserializeInteger, serializeInteger, serializeVarchar} = require('./_serialization');
 const {Duplex, PassThrough, Readable} = require('stream');
 
 class CargoCollectionStream extends Duplex {
@@ -63,26 +63,18 @@ class CargoCollectionStream extends Duplex {
             this._partialMessage.cargoId = this._bufferedReader.readOctets(this._partialMessage.cargoIdLengthPrefix).toString();
         }
 
-        // Get cargo length prefix
-        if (this._partialMessage.cargoLengthPrefix === undefined && !this._bufferedReader.hasOctets(1)) {
+        // Get the cargo length
+        if (this._partialMessage.cargoLength === undefined && !this._bufferedReader.hasOctets(4)) {
             return;
         }
-        if (this._partialMessage.cargoLengthPrefix === undefined) {
-            this._partialMessage.cargoLengthPrefix = this._bufferedReader.readOctets(1)[0];
+        if (this._partialMessage.cargoLength === undefined) {
+            this._partialMessage.cargoLength = deserializeInteger(this._bufferedReader.readOctets(4));
         }
-        if (this._partialMessage.cargoLengthPrefix === 0) {
+        if (this._partialMessage.cargoLength === 0) {
             // We MUST not acknowledge this cargo in production. It should be an error instead.
             const message = new CargoDelivery(this._partialMessage.cargoId, null);
             this._partialMessage = null;
             return message;
-        }
-
-        // Get the cargo length
-        if (this._partialMessage.cargoLength === undefined && !this._bufferedReader.hasOctets(this._partialMessage.cargoLengthPrefix)) {
-            return;
-        }
-        if (this._partialMessage.cargoLength === undefined) {
-            this._partialMessage.cargoLength = deserializeVarbigint(this._bufferedReader.readOctets(this._partialMessage.cargoLengthPrefix));
         }
 
         // Get the cargo itself
@@ -183,7 +175,7 @@ class CargoDeliveryStream extends Duplex {
         // to the CargoDelivery. Bear that in mind in the production implementation.
         this._socket.write('C'); // Message tag
         this._socket.write(serializeVarchar(id));
-        this._socket.write(serializeVarbigint(cargo.length));
+        this._socket.write(serializeInteger(cargo.length));
         this._socket.write(cargo);
         callback();
     }
