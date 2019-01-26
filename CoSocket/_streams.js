@@ -5,66 +5,9 @@ const {CargoDelivery} = require('./_packets');
 const {deserializeVarbigint, serializeVarbigint, serializeVarchar} = require('./_primitives');
 const {Duplex, PassThrough, Readable} = require('stream');
 
-class BufferedStream extends Readable {
-    constructor(stream) {
-        super();
-
-        this._stream = stream;
-        this._buffer = Buffer.allocUnsafe(0);
-        this._bufferLength = 0;
-        this._canProcessData = true;
-    }
-
-    init() {
-        this._stream.on('data', (data) => {
-            this._buffer = Buffer.concat([this._buffer, data]);
-            this._bufferLength += data.length;
-
-            this._canProcessData = true;
-            this.emit('canProcessData');
-        });
-
-        this._stream.on('end', () => {
-            this.push(null);
-        });
-
-        this._stream.on('error', (err) => {
-            this.emit('error', err);
-        });
-    }
-
-    canProcessData() {
-        return this._canProcessData;
-    }
-
-    getBufferLength() {
-        return this._bufferLength;
-    }
-
-    readOctets(octetsCount) {
-        if (this._bufferLength < octetsCount) {
-            throw new Error(`Can't read ${octetsCount} octets because we have ${this._buffer.length}`);
-        }
-
-        const octets = this._buffer.slice(0, octetsCount);
-        this._buffer = this._buffer.slice(octetsCount);
-
-        this._bufferLength -= octetsCount;
-        this._canProcessData = 0 < this._bufferLength;
-
-        return octets;
-    }
-
-    hasOctets(octetsCount) {
-        const hasOctets = octetsCount <= this._bufferLength;
-        this._canProcessData = hasOctets;
-        return hasOctets
-    }
-}
-
-class CargoCollectionStream extends Readable {
+class CargoCollectionStream extends Duplex {
     constructor(socket) {
-        super({objectMode: true});
+        super({readableObjectMode: true, writableObjectMode: true});
 
         this._socket = socket;
 
@@ -129,7 +72,7 @@ class CargoCollectionStream extends Readable {
         }
         if (this._partialMessage.cargoLengthPrefix === 0) {
             // We MUST not acknowledge this cargo in production. It should be an error instead.
-            const message = new CargoDelivery(this._partialMessage.cargoId, 0, null);
+            const message = new CargoDelivery(this._partialMessage.cargoId, null);
             this._partialMessage = null;
             return message;
         }
@@ -145,11 +88,7 @@ class CargoCollectionStream extends Readable {
         // Get the cargo itself
         let message;
         if (this._partialMessage.cargoPassThrough === undefined) {
-            message = new CargoDelivery(
-                this._partialMessage.cargoId,
-                this._partialMessage.cargoLength,
-                new PassThrough(),
-            );
+            message = new CargoDelivery(this._partialMessage.cargoId, new PassThrough());
             this._partialMessage.cargoPassThrough = message.stream;
             this._partialMessage.cargoOctetsPendingCount = this._partialMessage.cargoLength;
         } else {
@@ -170,6 +109,12 @@ class CargoCollectionStream extends Readable {
         }
 
         return message;
+    }
+
+    _write(deliveryAck, encoding, callback) {
+        this._socket.write('A');
+        this._socket.write(serializeVarchar(deliveryAck.id));
+        callback();
     }
 }
 
@@ -213,8 +158,8 @@ class CargoDeliveryStream extends Duplex {
         }
         if (this._partialDeliveryAck.cargoIdLengthPrefix === undefined) {
             const [tag, cargoIdLengthPrefix] = this._bufferedReader.readOctets(2);
-            if (String.fromCharCode(tag) !== 'c') {
-                this.emit('error', new Error(`Expected 'c' tag, got ${tag}`));
+            if (String.fromCharCode(tag) !== 'A') {
+                this.emit('error', new Error(`Expected 'A' tag, got ${tag}`));
                 this.push(null);
                 return;
             }
@@ -233,11 +178,71 @@ class CargoDeliveryStream extends Duplex {
     }
 
     _write({id, cargo}, encoding, callback) {
+        // This should actually be receiving a CargoDelivery instance instead for consistency,
+        // but we'd have to convert `cargo` to a readable stream and add the size
+        // to the CargoDelivery. Bear that in mind in the production implementation.
         this._socket.write('C'); // Message tag
         this._socket.write(serializeVarchar(id));
         this._socket.write(serializeVarbigint(cargo.length));
         this._socket.write(cargo);
         callback();
+    }
+}
+
+class BufferedStream extends Readable {
+    constructor(stream) {
+        super();
+
+        this._stream = stream;
+        this._buffer = Buffer.allocUnsafe(0);
+        this._bufferLength = 0;
+        this._canProcessData = true;
+    }
+
+    init() {
+        this._stream.on('data', (data) => {
+            this._buffer = Buffer.concat([this._buffer, data]);
+            this._bufferLength += data.length;
+
+            this._canProcessData = true;
+            this.emit('canProcessData');
+        });
+
+        this._stream.on('end', () => {
+            this.push(null);
+        });
+
+        this._stream.on('error', (err) => {
+            this.emit('error', err);
+        });
+    }
+
+    canProcessData() {
+        return this._canProcessData;
+    }
+
+    getBufferLength() {
+        return this._bufferLength;
+    }
+
+    readOctets(octetsCount) {
+        if (this._bufferLength < octetsCount) {
+            throw new Error(`Can't read ${octetsCount} octets because we have ${this._buffer.length}`);
+        }
+
+        const octets = this._buffer.slice(0, octetsCount);
+        this._buffer = this._buffer.slice(octetsCount);
+
+        this._bufferLength -= octetsCount;
+        this._canProcessData = 0 < this._bufferLength;
+
+        return octets;
+    }
+
+    hasOctets(octetsCount) {
+        const hasOctets = octetsCount <= this._bufferLength;
+        this._canProcessData = hasOctets;
+        return hasOctets
     }
 }
 

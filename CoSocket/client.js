@@ -4,7 +4,7 @@
 const net = require('net');
 const uuid4 = require('uuid4');
 const {CargoCollectionStream, CargoDeliveryStream} = require('./_streams');
-const {serializeVarchar} = require('./_primitives');
+const {CargoDeliveryAck, INTENTS} = require('./_packets');
 
 class Client {
     constructor(socketPath) {
@@ -16,12 +16,13 @@ class Client {
      * @returns {Promise<Array<string>>}
      */
     deliverCargoes(cargoesGenerator) {
+        // This function should be a generator in production
         const deliveredCargoIds = [];
         const cargoIdByCargoDeliveryId = {};
 
         return new Promise((resolve, reject) => {
             const client = net.createConnection(this._socketPath, async function () {
-                client.write('D'); // Intent ("D" for "deliver")
+                client.write(INTENTS.DELIVER);
 
                 const stream = new CargoDeliveryStream(client);
                 stream.on('data', (data) => {
@@ -32,7 +33,7 @@ class Client {
                         delete cargoIdByCargoDeliveryId[cargoDeliveryId];
                     }
                     if (Object.keys(cargoIdByCargoDeliveryId).length === 0) {
-                        // The server has acknowledged the receipt of each cargo
+                        // The server has acknowledged the receipt of all cargoes
                         client.end();
                         resolve(deliveredCargoIds);
                     }
@@ -47,6 +48,7 @@ class Client {
                 }
 
                 if (Object.keys(cargoIdByCargoDeliveryId).length === 0) {
+                    // No cargo was delivered.
                     client.end();
                     resolve([]);
                     return;
@@ -65,21 +67,22 @@ class Client {
     }
 
     collectCargoes() {
+        // This function should be a generator in production
         const cargoes = [];
 
         return new Promise((resolve, reject) => {
             const client = net.createConnection(this._socketPath, async function () {
-                client.write('C'); // Intent ("C" for "collect")
+                client.write(INTENTS.COLLECT);
 
-                const collectionStream = new CargoCollectionStream(client);
-                collectionStream.on('data', (cargoDelivery) => {
+                const stream = new CargoCollectionStream(client);
+                stream.on('data', (cargoDelivery) => {
                     cargoes.push(cargoDelivery.stream);
 
-                    // ACK
-                    client.write('c');
-                    client.write(serializeVarchar(cargoDelivery.id));
+                    // We should only ACK when the cargo has been safely persisted or
+                    // relayed in production.
+                    stream.write(new CargoDeliveryAck(cargoDelivery.id));
                 });
-                collectionStream.init();
+                stream.init();
 
                 client.setTimeout(2000, () => {
                     client.end();

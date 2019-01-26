@@ -5,14 +5,9 @@ const fs = require('fs');
 const net = require('net');
 const uuid4 = require('uuid4');
 const VError = require('verror');
-const {serializeVarchar} = require('./_primitives');
+const {CargoDeliveryAck, getIntent, INTENTS} = require('./_packets');
 const {CargoCollectionStream, CargoDeliveryStream} = require('./_streams');
 const {CARGO_SERIALIZER, deserializeCargoPayload, serializeCargoPayload} = require('../core/serialization');
-
-const INTENTS = {
-    COLLECT: 'C',
-    DELIVER: 'D',
-};
 
 function runServer(socketPath, certPath, keyPath, parcelNotifier, cargoPayloadFetcher) {
     if (fs.existsSync(socketPath)) {
@@ -23,16 +18,21 @@ function runServer(socketPath, certPath, keyPath, parcelNotifier, cargoPayloadFe
         async function triggerIntent(data) {
             client.off('data', triggerIntent);
 
-            const intent = data.slice(0, 1).toString();
+            const intentTagBuffer = data.slice(0, 1);
             client.unshift(data.slice(1));
 
             // When the client collects then the server delivers, and vice versa.
-            if (intent === INTENTS.DELIVER) {
-                await collectCargoes(client, keyPath, parcelNotifier);
-            } else if (intent === INTENTS.COLLECT) {
-                await deliverCargoes(client, cargoPayloadFetcher, certPath, keyPath, parcelNotifier);
-            } else {
-                client.destroy(new Error('Unexpected intent ' + intent));
+            switch (getIntent(intentTagBuffer)) {
+                case INTENTS.DELIVER:
+                    await collectCargoes(client, keyPath, parcelNotifier);
+                    break;
+                case INTENTS.COLLECT:
+                    await deliverCargoes(client, cargoPayloadFetcher, certPath, keyPath, parcelNotifier);
+                    break;
+                default:
+                    const error = new Error(`Invalid intent tag ${intentTagBuffer.toString('hex')} (hex)`);
+                    client.destroy(error);
+                    break;
             }
         }
 
@@ -57,8 +57,7 @@ async function collectCargoes(client, keyPath, parcelNotifier) {
         if (cargoDelivery.stream === null) {
             // Acknowledge this empty cargo but don't do anything with it. An error MUST be sent to
             // the client instead in production.
-            client.write('c');
-            client.write(serializeVarchar(cargoDelivery.id));
+            stream.write(new CargoDeliveryAck(cargoDelivery.id));
 
             console.warn(`Cargo ${cargoDelivery.id} was ignored because it was empty`);
             return;
@@ -81,9 +80,7 @@ async function collectCargoes(client, keyPath, parcelNotifier) {
             }
 
             if (!client.destroyed) {
-                // ACK
-                client.write('c');
-                client.write(serializeVarchar(cargoDelivery.id));
+                stream.write(new CargoDeliveryAck(cargoDelivery.id));
             }
         });
     });
