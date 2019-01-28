@@ -13,16 +13,22 @@ const pogrpcPackageDefinition = grpcProtoLoader.loadSync(
 );
 const PogRPCService = grpc.loadPackageDefinition(pogrpcPackageDefinition).relaynet.pogrpc.PogRPC;
 
-class GatewayClient {
+class Client {
 
     /**
-     * @param netloc
+     * @param {string} targetEndpointNetloc
+     * @param {null|string} gatewayAddress The relaying gateway's address, if applicable.
      * @param {boolean|Buffer} tls Whether to use TLS, and if so, optionally which self-signed cert to use
      */
-    constructor(netloc, tls = true) {
+    constructor(targetEndpointNetloc, gatewayAddress = null, tls = true) {
         const cert = (Buffer.isBuffer(tls)) ? tls : null;
         const credentials = (tls) ? grpc.credentials.createSsl(cert) : grpc.credentials.createInsecure();
-        this._grpcClient = new PogRPCService(netloc, credentials);
+        this._grpcClient = new PogRPCService(targetEndpointNetloc, credentials);
+
+        this._grpcMetadata = new grpc.Metadata();
+        if (gatewayAddress) {
+            this._grpcMetadata.add('Gateway', gatewayAddress);
+        }
     }
 
     deliverParcels(parcels) {
@@ -33,7 +39,7 @@ class GatewayClient {
         let allParcelsSent = false;
 
         return new Promise((resolve, reject) => {
-            const call = this._grpcClient.deliverParcels();
+            const call = this._grpcClient.deliverParcels(this._grpcMetadata);
 
             call.on('data', function (deliveryAck) {
                 if (!sentParcelIds.has(deliveryAck.id)) {
@@ -101,4 +107,4 @@ class GatewayClient {
     }
 }
 
-module.exports = GatewayClient;
+module.exports = Client;

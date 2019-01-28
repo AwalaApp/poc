@@ -2,39 +2,52 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-const cosocketGateway = require('../CoSocket/gateway');
+const cosocketServer = require('../CoSocket/server');
 const EventEmitter = require('events');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const pogrpcGateway = require('../PogRPC/gateway');
-const PogRPCGatewayClient = require('../PogRPC/gateway_client');
+const PogRPCClient = require('../PogRPC/client');
+const {createHash} = require('crypto');
 const {getAddressFromCert} = require('../core/pki');
 const {PARCEL_SERIALIZER} = require('../core/serialization');
 
-// This gateway is reusing the asymmetric keys for parcel delivery and cargo relay *for expediency*
-// in the context of this PoC.
-const CERT_PATH = path.normalize(__dirname + '/../certs/relayer-gateway.cert.pem');
-const KEY_PATH = path.normalize(__dirname + '/../certs/relayer-gateway.key.pem');
+const DATA_DIR_PATH = path.join(os.tmpdir(), 'relayer-gateway-data');
+const CRN_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'crn-parcels');
 
-const COSOCKET_SOCKET_PATH = '/tmp/relayer-gateway.sock';
+const COSOCKET_PATH = path.join(DATA_DIR_PATH, 'cosocket.sock');
 const POGRPC_NETLOC = '127.0.0.1:21473'; // 21473? Too late!
 
-// We're whitelisting the self-signed cert for the API endpoint's gRPC server for
-// expediency, but this MUST NOT be done in a production-ready implementation.
-const TWITTER_API_ENDPOINT_SERVER_CERT = fs.readFileSync(__dirname + '/../certs/twitter-endpoint-server.cert.pem');
+const CERTS_DIR_PATH = path.join(path.dirname(__dirname), 'certs');
+// This gateway is reusing the asymmetric keys for parcel delivery and cargo relay *for expediency*
+// in the context of this PoC.
+const CERT_PATH = path.join(CERTS_DIR_PATH, 'relayer-gateway.cert.pem');
+const KEY_PATH = path.join(CERTS_DIR_PATH, 'relayer-gateway.key.pem');
+
+const GATEWAY_CRN_ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
+const GATEWAY_PDN_ADDRESS = `rneh+grpc:${POGRPC_NETLOC}`;
+
+// We're whitelisting the self-signed cert for the API endpoint's gRPC server for expediency, but this MUST NOT be
+// done in production.
+const TWITTER_API_ENDPOINT_SERVER_CERT = fs.readFileSync(path.join(
+    CERTS_DIR_PATH,
+    'twitter-endpoint-server.cert.pem',
+));
 
 function main() {
-    const gatewayOpaqueAddress = getAddressFromCert(fs.readFileSync(CERT_PATH));
+    fs.mkdirSync(DATA_DIR_PATH, {recursive: true});
+    fs.mkdirSync(CRN_PARCELS_DIR_PATH, {recursive: true});
 
     const parcelNotifier = new EventEmitter();
     parcelNotifier.on('crn', deliverCrnParcel);
     parcelNotifier.on('pdn', deliverPndParcel);
 
-    cosocketGateway.runServer(COSOCKET_SOCKET_PATH, KEY_PATH, parcelNotifier);
+    cosocketServer(COSOCKET_PATH, CERT_PATH, KEY_PATH, parcelNotifier, fetchCargoesPayloads);
     pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier);
 
-    console.log(`Running relayer's gateway ${gatewayOpaqueAddress}
-CoSocket listening on ${COSOCKET_SOCKET_PATH}
+    console.log(`Running relayer's gateway ${GATEWAY_CRN_ADDRESS}
+CoSocket listening on ${COSOCKET_PATH}
 PogRPC listening on ${POGRPC_NETLOC}
 `);
 }
@@ -52,43 +65,77 @@ PogRPC listening on ${POGRPC_NETLOC}
  *
  * - It should support multiple parcel delivery bindings, not just PogRPC.
  * - Whatever the binding, it should _queue_ the delivery, not do it in band.
- * - It should support parcels sent to private endpoints (those with opaque addresses). This is necessary
- *   if the gateway is serving an individual user (and their private endpoints), but it's unlikely to be
- *   necessary when the gateway is serving a relayer (unless the relayer chooses to expose private endpoints).
+ * - It should support parcels sent to private endpoints (those with opaque
+ *   addresses). Whilst unlikely, it'd be necessary if/when the relayer exposes
+ *   private endpoints.
  *
- * @param parcelSerialization
+ * @param parcelSerialized
  * @returns {Promise<void>}
  */
-async function deliverCrnParcel(parcelSerialization) {
-    const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
+async function deliverCrnParcel(parcelSerialized) {
+    const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
     const {scheme, address} = recipient.match(/^(?<scheme>[\w+]+):(?<address>.+)$/).groups;
 
-    if (scheme !== 'rneh') {
-        console.error(`Can only deliver parcels to host endpoints. Parcel ${id}  for ${recipient} will be ignored.`);
+    if (scheme !== 'rneh' && !scheme.startsWith('rneh+')) {
+        console.error(`This relayer gateway can only deliver parcels to host endpoints. Parcel ${id} for ${recipient} will be ignored.`);
         return;
-
-        // This is just a limitation in the PoC. A relayer might choose to expose
-        // its own private endpoints to the remote endpoints it supports.
     }
 
-    // NB: This PoC assumes the host endpoint only supports PogRPC, when in fact it
-    // should use Application-Layer Protocol Negotiation to determine which PND
-    // binding to use.
+    if (scheme.startsWith('rneh+') && scheme !== 'rneh+grpc') {
+        // The address includes the binding hint, but PogRPC is the only supported binding
+        // in this PoC.
+        console.error(`This PoC can only deliver parcels via PogRPC. Parcel ${id}  will be ignored.`);
+        return;
 
-    const gatewayClient = new PogRPCGatewayClient(
+        // Note: When the binding hint is missing from the address, we should use
+        // Application-Layer Protocol Negotiation (ALPN) to determine the binding.
+        // This PoC doesn't use ALPN for expediency and it only supports PogRPC.
+    }
+
+    const pdnClient = new PogRPCClient(
         address,
+        GATEWAY_PDN_ADDRESS,
         TWITTER_API_ENDPOINT_SERVER_CERT, // Don't do in production
     );
     try {
-        await gatewayClient.deliverParcels([parcelSerialization]);
+        await pdnClient.deliverParcels([parcelSerialized]);
     } catch (error) {
-        console.error(`Could not relay parcel to ${recipient}:`, error.toString());
+        // We should retry in production, depending on the type of error.
+        console.error(`Could not deliver parcel ${id} to ${recipient}:`, error.toString());
+        return;
     }
+
+    console.log(`[CRN] Delivered parcel ${id} to ${recipient}`);
 }
 
-async function deliverPndParcel(parcelSerialization) {
-    // const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
-    throw new Error('unimplemented!')
+async function deliverPndParcel(parcelSerialized) {
+    const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
+
+    const hash = createHash('sha256');
+    hash.update(parcel.senderCert);
+    hash.update(parcel.id);
+    const internalParcelId = hash.digest('hex');
+
+    const parcelPath = path.join(CRN_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
+    fs.writeFileSync(parcelPath, parcelSerialized);
+    console.log(`[PDN] Added parcel ${parcel.id} to CRN queue.`);
+}
+
+/**
+ * Return all the parcels that should be relayed in a single cargo.
+ *
+ * In production, the equivalent of this function MUST yield multiple values if the parcels could not
+ * fit in one cargo.
+ *
+ * The function is a generator and takes the target gateway addresses as input because the generic code
+ * in the CRN server should be agnostic of the storage medium. This implementation uses the file system,
+ * but a relayer's gateway could use S3 or a DB to store the parcels, for example.
+ *
+ * @param {Array<string>} gatewayAddresses
+ * @returns {AsyncIterableIterator<{gatewayAddress: string, parcels}>}
+ */
+async function* fetchCargoesPayloads(gatewayAddresses) {
+    console.warn('fetchCargoesPayloads is not implemented yet');
 }
 
 main();

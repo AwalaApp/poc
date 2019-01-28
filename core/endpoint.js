@@ -8,16 +8,16 @@ const {getAddressFromCert} = require('./pki');
 const {PARCEL_SERIALIZER} = require('./serialization');
 
 class ClientEndpoint {
-    constructor(certPath, keyPath, gatewayClient) {
+    constructor(certPath, keyPath, pdnClient) {
         this.cert = fs.readFileSync(certPath);
         this.keyPath = keyPath;
 
-        this._gatewayClient = gatewayClient;
+        this._pdnClient = pdnClient;
 
         this._endpointAddres = getAddressFromCert(fs.readFileSync(certPath));
     }
 
-    async deliverMessage(messageSerialized, targetEndpointCertPath, {signatureHashAlgo = 'sha256', id = null, date = null, ttl = 0}) {
+    async deliverMessage(messageSerialized, targetEndpointCertPath, {signatureHashAlgo = 'sha256', id = null, date = null, ttl = 0} = {}) {
         const parcel = await PARCEL_SERIALIZER.serialize(
             messageSerialized,
             targetEndpointCertPath,
@@ -28,11 +28,11 @@ class ClientEndpoint {
             date,
             ttl,
         );
-        await this._gatewayClient.deliverParcels([parcel]);
+        await this._pdnClient.deliverParcels([parcel]);
     }
 
     async* collectMessages() {
-        const parcelSerializations = this._gatewayClient.collectParcels();
+        const parcelSerializations = this._pdnClient.collectParcels();
         for (const parcelSerialized of parcelSerializations) {
             const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
 

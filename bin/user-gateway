@@ -70,17 +70,17 @@ PDN:
  *   if the gateway is serving an individual user (and their private endpoints), but it's unlikely to be
  *   necessary when the gateway is serving a relayer (unless the relayer chooses to expose private endpoints).
  *
- * @param parcelSerialization
+ * @param parcelSerialized
  * @returns {Promise<void>}
  */
-async function deliverCrnParcel(parcelSerialization) {
-    const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
+async function deliverCrnParcel(parcelSerialized) {
+    const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
     console.log(`[CRN] Received parcel ${id} for ${recipient}`);
     throw new Error('unimplemented');
 }
 
-async function deliverPndParcel(parcelSerialization) {
-    const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialization);
+async function deliverPndParcel(parcelSerialized) {
+    const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
 
     const hash = createHash('sha256');
     hash.update(parcel.senderCert);
@@ -88,7 +88,7 @@ async function deliverPndParcel(parcelSerialization) {
     const internalParcelId = hash.digest('hex');
 
     const parcelPath = path.join(CRN_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
-    fs.writeFileSync(parcelPath, parcelSerialization);
+    fs.writeFileSync(parcelPath, parcelSerialized);
     console.log(`[PDN] Added parcel ${parcel.id} to CRN queue.`);
 }
 

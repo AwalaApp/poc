@@ -26,12 +26,19 @@ function runHost(netloc, serverCert, serverKey, endpointKeyPath, messageProcesso
     const server = new grpc.Server();
     server.addService(pogrpcPackage.PogRPC.service, {
         deliverParcels(call) {
+            // Zero or one gateway must be present. Multiple values MUST be rejected in production.
+            const relayingGatewayAddress = (call.metadata.get('Gateway') || [null])[0];
+
             call.on('data', async function (parcelDelivery) {
                 const parcel = await PARCEL_SERIALIZER.deserialize(parcelDelivery.parcel);
 
                 // Pretend the parcel labels were successfully validated at this point.
 
-                await messageProcessor(await parcel.decryptPayload(endpointKeyPath));
+                await messageProcessor(
+                    await parcel.decryptPayload(endpointKeyPath),
+                    parcel.senderCert,
+                    relayingGatewayAddress,
+                );
 
                 call.write({id: parcelDelivery.id}); // ACK
             });

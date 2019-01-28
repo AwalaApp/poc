@@ -1,7 +1,8 @@
 syntax = "proto3";
 package twitter.relaynet_poc;
 
-// NB: Protocol Buffers is only used to serialize the messages. No RPC here -- Remember we're actually trying to move away from that!
+// NB: Protocol Buffers is only used to serialize the messages. No RPC here because
+// we're actually embracing asynchronous messaging.
 
 import "google/protobuf/timestamp.proto";
 
