@@ -3,20 +3,23 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const Endpoint = require('../core/endpoint');
-const PogRPCGatewayClient = require('../PogRPC/gateway_client');
+const fs = require('fs');
+const PogRPCClient = require('../PogRPC/client');
 const readline = require('readline');
 const TwitterClient = require('../twitter-service/client');
+const {getAddressFromCert} = require('../core/pki');
 
 require('dotenv').config();
 
-const CERT_PATH = __dirname + '/../certs/twitter-client.cert.pem';
-const KEY_PATH = __dirname + '/../certs/twitter-client.key.pem';
+const CERT_PATH = __dirname + '/../certs/twitter-app.cert.pem';
+const KEY_PATH = __dirname + '/../certs/twitter-app.key.pem';
 
 const GATEWAY_ADDRESS = '127.0.0.1:1473';
+const ENDPOINT_ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
 
 async function main() {
-    const gatewayClient = new PogRPCGatewayClient(GATEWAY_ADDRESS, false);
-    const endpoint = new Endpoint(CERT_PATH, KEY_PATH, gatewayClient);
+    const pdnClient = new PogRPCClient(GATEWAY_ADDRESS, ENDPOINT_ADDRESS, false); // MUST only use TLS in production
+    const endpoint = new Endpoint(CERT_PATH, KEY_PATH, pdnClient);
     const twitterClient = new TwitterClient(
         process.env.TWITTER_ACCESS_TOKEN_KEY,
         process.env.TWITTER_ACCESS_TOKEN_SECRET,
@@ -28,14 +31,14 @@ async function main() {
 
     console.log('');
 
-    const tweetStatus = await promptTweet();
+    const tweetStatus = await promptTweetStatus();
     if (tweetStatus) {
         await twitterClient.postTweet({status: tweetStatus});
         console.log('✔️ Tweet added to queue.')
     }
 }
 
-function promptTweet() {
+function promptTweetStatus() {
     const rlInterface = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -48,6 +51,10 @@ function promptTweet() {
     });
 }
 
+/**
+ * @param {Iterable<TweetMessage>} tweetMessages
+ * @returns {Promise<void>}
+ */
 async function printCollectedTweets(tweetMessages) {
     console.log('New Tweets:');
     let anyTweet;
