@@ -4,6 +4,7 @@
 const {CargoDelivery} = require('./_packets');
 const {Duplex, PassThrough, Readable} = require('stream');
 
+const _MAX_VARCHAR_SIZE = (2 ** 8) - 1; // 8-bit
 const _MAX_INTEGER = (2 ** 32) - 1; // 32-bit
 
 class CargoCollectionStream extends Duplex {
@@ -244,11 +245,11 @@ class BufferedStream extends Readable {
  * @returns {Uint8Array}
  */
 function serializeVarchar(string) {
-    const stringBuffer = Buffer.from(string);
+    const stringBuffer = Buffer.from(string, 'utf-8');
     const stringBufferLength = stringBuffer.length;
 
-    if (256 < stringBufferLength) {
-        throw new Error(`Cannot create a varchar of more than 256 octets`);
+    if (_MAX_VARCHAR_SIZE < stringBufferLength) {
+        throw new Error(`Cannot create a varchar of more than ${_MAX_VARCHAR_SIZE} octets`);
     }
 
     const varchar = new Uint8Array(1 + stringBufferLength);
