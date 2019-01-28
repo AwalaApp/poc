@@ -2,7 +2,7 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const path = require('path');
-const {TwitterCredentials, TweetMessage} = require('./messages');
+const {TwitterCredentials, TweetMessage} = require('./service_messages');
 
 // Clients still have to ship with the target endpoint's certificate in production.
 // This is just an initial certificate and it can be rotated subsequently, after

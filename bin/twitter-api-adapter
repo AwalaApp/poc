@@ -6,13 +6,16 @@ const fs = require('fs');
 const path = require('path');
 const twitterApiAdapter = require('../twitter-service/api_adapter');
 
-const SERVER_CERT = fs.readFileSync(__dirname + '/../certs/twitter-endpoint-server.cert.pem');
-const SERVER_KEY = fs.readFileSync(__dirname + '/../certs/twitter-endpoint-server.key.pem');
-const ENDPOINT_KEY_PATH = path.normalize(__dirname + '/../certs/twitter-endpoint.key.pem');
+const CERTS_DIR_PATH = path.join(path.dirname(__dirname), 'certs');
+const SERVER_CERT = fs.readFileSync(path.join(CERTS_DIR_PATH, 'twitter-endpoint-server.cert.pem'));
+const SERVER_KEY = fs.readFileSync(path.join(CERTS_DIR_PATH, 'twitter-endpoint-server.key.pem'));
+const ENDPOINT_CERT_PATH = path.join(CERTS_DIR_PATH, 'twitter-endpoint.cert.pem');
+const ENDPOINT_KEY_PATH = path.join(CERTS_DIR_PATH, 'twitter-endpoint.key.pem');
 
 twitterApiAdapter.runServer(
     '127.0.0.1:8080',
     SERVER_CERT,
     SERVER_KEY,
+    ENDPOINT_CERT_PATH,
     ENDPOINT_KEY_PATH,
 );
