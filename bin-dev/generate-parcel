@@ -4,11 +4,13 @@
 
 const fs = require('fs');
 const yargs = require('yargs');
-const {PARCEL_SERIALIZER} = require('../core/serialization');
+const {PARCEL_SERIALIZER, serializeServiceMessage} = require('../core/serialization');
+const {ServiceMessage} = require('../core/messages');
 
 async function main(argv) {
+    const messageSerialized = fs.readFileSync(process.stdin.fd);
     process.stdout.write(await PARCEL_SERIALIZER.serialize(
-        fs.readFileSync(process.stdin.fd),
+        serializeServiceMessage(new ServiceMessage(messageSerialized, argv.type)),
         argv.recipientCert,
         fs.readFileSync(argv.senderCert),
         argv.senderKey,
@@ -36,6 +38,12 @@ const argv = yargs
         demandOption: true,
         requiresArg: true,
         description: "The sender's X.509 key (PEM-encoded) to sign the message",
+        normalize: true,
+    })
+    .option('type', {
+        demandOption: true,
+        requiresArg: true,
+        description: "The media type of the input message (e.g., application/json)",
         normalize: true,
     })
     .option('sign-hash-algo', {

@@ -19,6 +19,10 @@ const INTENTS = {
     DELIVER: 'D',
 };
 
+/**
+ * @param {Buffer} intentTagBuffer
+ * @return {null|string}
+ */
 function getIntent(intentTagBuffer) {
     const intentTag = intentTagBuffer.toString();
     return (Object.values(INTENTS).includes(intentTag)) ? intentTag : null;

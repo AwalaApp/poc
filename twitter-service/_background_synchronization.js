@@ -8,22 +8,25 @@ require('dotenv').config();
 
 const POLLING_FREQUENCY_SECONDS = 90;
 
+/**
+ * @param {APIAdapterEndpoint} apiAdapter
+ * @param subscriptionNotifier
+ * @returns {Promise<void>}
+ */
 async function main(apiAdapter, subscriptionNotifier) {
     const users = {};
 
-    subscriptionNotifier.on('subscription', function (twitterCredentials, targetEndpointCert, parcelDeliveryAuthCert, relayEndpoint) {
+    function subscribeUser(twitterCredentials, targetEndpointCert, parcelDeliveryAuthCert, relayEndpoint) {
         let user = users[twitterCredentials.accessTokenKey];
         if (!user) {
             user = new User(twitterCredentials.accessTokenKey, twitterCredentials.accessTokenSecret);
             users[twitterCredentials.accessTokenKey] = user;
         }
 
-        user.addSubscription(new EndpointSubscription(
-            targetEndpointCert,
-            parcelDeliveryAuthCert,
-            relayEndpoint,
-        ));
-    });
+        user.addSubscription(new EndpointSubscription(targetEndpointCert, parcelDeliveryAuthCert, relayEndpoint));
+    }
+
+    subscriptionNotifier.on('subscription', subscribeUser);
 
     while (true) {
         await sleep(POLLING_FREQUENCY_SECONDS);
@@ -36,15 +39,26 @@ async function main(apiAdapter, subscriptionNotifier) {
 }
 
 class EndpointSubscription {
+
+    /**
+     * @param {Buffer} targetEndpointCert
+     * @param {Buffer} parcelDeliveryAuthCert
+     * @param {string} relayEndpoint
+     */
     constructor(targetEndpointCert, parcelDeliveryAuthCert, relayEndpoint) {
         this._targetEndpointCert = targetEndpointCert;
         this._parcelDeliveryAuthCert = parcelDeliveryAuthCert;
         this._relayEndpoint = relayEndpoint;
     }
 
-    async deliverMessage(messageSerialized, apiAdapter) {
+    /**
+     * @param {Message} message
+     * @param {APIAdapterEndpoint} apiAdapter
+     * @returns {Promise<void>}
+     */
+    async deliverMessage(message, apiAdapter) {
         await apiAdapter.deliverMessage(
-            messageSerialized,
+            message,
             this._targetEndpointCert,
             this._relayEndpoint,
             this._parcelDeliveryAuthCert,
@@ -59,30 +73,45 @@ class User {
         this._endpointSubscriptions = [];
     }
 
+    /**
+     * @param {EndpointSubscription} subscription
+     */
     addSubscription(subscription) {
         this._endpointSubscriptions.push(subscription);
     }
 
+    /**
+     * @param {APIAdapterEndpoint} apiAdapter
+     * @returns {Promise<void>}
+     */
     async deliverUpdates(apiAdapter) {
-        const tweets = await this._pollTimeline();
+        const tweets = await this._getHomeTimeline();
         for (const tweet of tweets) {
             const tweetMsg = TweetMessage.create({
                 creationDate: new Date(tweet.created_at),
                 status: tweet.text,
                 author: `@${tweet.user.screen_name}`,
             });
-            const tweetMsgSerialized = TweetMessage.encode(tweetMsg).finish();
-            await this._deliverMessage(tweetMsgSerialized, apiAdapter);
+            await this._deliverMessage(tweetMsg, apiAdapter);
         }
     }
 
-    async _deliverMessage(messageSerialized, apiAdapter) {
+    /**
+     * @param {Message} message
+     * @param {APIAdapterEndpoint} apiAdapter
+     * @returns {Promise<void>}
+     */
+    async _deliverMessage(message, apiAdapter) {
         for (const subscription of this._endpointSubscriptions) {
-            await subscription.deliverMessage(messageSerialized, apiAdapter);
+            await subscription.deliverMessage(message, apiAdapter);
         }
     }
 
-    async _pollTimeline() {
+    /**
+     * @returns {Promise<Array<Object>>}
+     * @private
+     */
+    async _getHomeTimeline() {
         const twitterClient = new Twitter({
             subdomain: "api",
             consumer_key: process.env.TWITTER_CONSUMER_KEY,

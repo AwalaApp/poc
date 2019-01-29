@@ -6,6 +6,10 @@
 const assert = require('assert').strict;
 const {certificateFromPem} = require('node-forge').pki;
 
+/**
+ * @param {Buffer} certPem
+ * @returns {string}
+ */
 function getAddressFromCert(certPem) {
     const cert = certificateFromPem(certPem);
     const extension = cert.getExtension('subjectAltName');

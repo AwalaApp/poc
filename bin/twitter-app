@@ -8,6 +8,7 @@ const PogRPCClient = require('../PogRPC/client');
 const readline = require('readline');
 const TwitterClient = require('../twitter-service/client');
 const {getAddressFromCert} = require('../core/pki');
+const {TweetMessage, deserializeMessage, serializeMessage} = require('../twitter-service/service_messages');
 
 require('dotenv').config();
 
@@ -19,21 +20,21 @@ const ENDPOINT_ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
 
 async function main() {
     const pdnClient = new PogRPCClient(GATEWAY_ADDRESS, ENDPOINT_ADDRESS, false); // MUST only use TLS in production
-    const endpoint = new Endpoint(CERT_PATH, KEY_PATH, pdnClient);
+    const endpoint = new Endpoint(CERT_PATH, KEY_PATH, pdnClient, serializeMessage, deserializeMessage);
     const twitterClient = new TwitterClient(
         process.env.TWITTER_ACCESS_TOKEN_KEY,
         process.env.TWITTER_ACCESS_TOKEN_SECRET,
         endpoint,
     );
 
-    const collectedTweets = await twitterClient.collectMessages();
-    await printCollectedTweets(collectedTweets);
+    await printCollectedMessages(endpoint.collectMessages());
 
     console.log('');
 
     const tweetStatus = await promptTweetStatus();
     if (tweetStatus) {
-        await twitterClient.postTweet({status: tweetStatus});
+        const tweet = TweetMessage.create({status: tweetStatus});
+        await twitterClient.postTweet(tweet);
         console.log('✔️ Tweet added to queue.')
     }
 }
@@ -52,14 +53,19 @@ function promptTweetStatus() {
 }
 
 /**
- * @param {Iterable<TweetMessage>} tweetMessages
+ * @param {AsyncIterableIterator<Message>} messages
  * @returns {Promise<void>}
  */
-async function printCollectedTweets(tweetMessages) {
+async function printCollectedMessages(messages) {
     console.log('New Tweets:');
     let anyTweet;
-    for (const tweetMessage of tweetMessages) {
-        console.log(`- ${tweetMessage.author} said: ${tweetMessage.status}`);
+    for await (const message of messages) {
+        if (!(message instanceof TweetMessage)) {
+            console.warn(`${message} was received but it isn't a tweet`);
+            break;
+        }
+
+        console.log(`- ${message.author} said: ${message.status}`);
         anyTweet = true;
     }
 

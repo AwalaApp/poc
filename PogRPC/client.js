@@ -13,7 +13,7 @@ const pogrpcPackageDefinition = grpcProtoLoader.loadSync(
 );
 const PogRPCService = grpc.loadPackageDefinition(pogrpcPackageDefinition).relaynet.pogrpc.PogRPC;
 
-class Client {
+class PogRPCClient {
 
     /**
      * @param {string} targetEndpointNetloc
@@ -31,6 +31,10 @@ class Client {
         }
     }
 
+    /**
+     * @param {Iterable<Parcel>} parcels
+     * @returns {Promise<void>}
+     */
     deliverParcels(parcels) {
         // The final implementation should actually work with streams instead of loading everything in
         // memory and doing so much stuff synchronously.
@@ -78,13 +82,17 @@ class Client {
         });
     }
 
+    /**
+     * @returns {Promise<Array<Buffer>>}
+     */
     collectParcels() {
         // The final implementation should actually work with streams instead of loading everything in
         // memory and doing so much stuff synchronously.
         const receivedParcels = [];
+        const self = this;
 
         return new Promise(function (resolve, reject) {
-            const call = this._grpcClient.collectParcels();
+            const call = self._grpcClient.collectParcels();
 
             call.on('data', function (parcelDelivery) {
                 receivedParcels.push(parcelDelivery.parcel);
@@ -107,4 +115,4 @@ class Client {
     }
 }
 
-module.exports = Client;
+module.exports = PogRPCClient;

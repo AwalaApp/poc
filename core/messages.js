@@ -4,11 +4,11 @@
 const {decrypt} = require('./_cms');
 
 /**
- * Relaynet Abstract Message v1
+ * Relaynet Abstract Message Format v1
  *
  * In real life, this would be a *stream* (wrapping the payload).
  */
-class Message {
+class RAMFMessage {
     constructor(recipient, senderCert, id, date, ttl, payload) {
         this.recipient = recipient;
         this.senderCert = senderCert;
@@ -18,16 +18,34 @@ class Message {
         this.payload = payload;
     }
 
+    /**
+     * @param {string} privateKeyPath
+     * @returns {Promise<Buffer>}
+     */
     async decryptPayload(privateKeyPath) {
         return await decrypt(this.payload, privateKeyPath);
     }
 }
 
-class Parcel extends Message {}
+class Parcel extends RAMFMessage {
+}
 
-class Cargo extends Message {}
+class Cargo extends RAMFMessage {
+}
+
+class ServiceMessage {
+    /**
+     * @param {Buffer|Uint8Array} messageSerialized
+     * @param {string} type
+     */
+    constructor(messageSerialized, type) {
+        this.messageSerialized = messageSerialized;
+        this.type = type;
+    }
+}
 
 module.exports = {
-    Parcel,
     Cargo,
+    Parcel,
+    ServiceMessage,
 };

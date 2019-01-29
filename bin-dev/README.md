@@ -54,6 +54,7 @@ echo "Winter is coming" | ./generate-parcel \
     --recipient-cert /tmp/e2_cert.pem \
     --sender-cert /tmp/e1_cert.pem \
     --sender-key /tmp/e1_key.pem \
+    --type text/plain \
     > /tmp/output.parcel
 ```
 
@@ -73,6 +74,7 @@ echo "Winter is coming" | ./generate-parcel \
     --recipient-cert /tmp/e2_cert.pem \
     --sender-cert /tmp/e1_cert.pem \
     --sender-key /tmp/e1_key.pem \
+    --type text/plain \
     | \
     ./inspect-message \
         --recipient-key /tmp/e2_key.pem \

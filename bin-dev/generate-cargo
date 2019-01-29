@@ -64,8 +64,9 @@ function configureArgs(builder) {
     ;
 }
 
+// noinspection BadExpressionStatementJS
 yargs
-    .command('$0 [parcel..]', 'Generate cargo', configureArgs, main)
+    .command('$0 [parcel..]', 'Generate cargo', configureArgs, main) // noinspection JSUnresolvedFunction
     .strict()
     .help()
     .argv;

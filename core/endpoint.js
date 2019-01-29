@@ -8,18 +8,39 @@ const {getAddressFromCert} = require('./pki');
 const {PARCEL_SERIALIZER} = require('./serialization');
 
 class ClientEndpoint {
-    constructor(certPath, keyPath, pdnClient) {
+
+    /**
+     * @param {string} certPath
+     * @param {string} keyPath
+     * @param {PogRPCClient} pdnClient
+     * @param {function(Message): Buffer} serializer
+     * @param {function(Buffer): Message} deserializer
+     */
+    constructor(certPath, keyPath, pdnClient, serializer, deserializer) {
         this.cert = fs.readFileSync(certPath);
         this.keyPath = keyPath;
 
         this._pdnClient = pdnClient;
 
+        this._serializer = serializer;
+        this._deserializer = deserializer;
+
         this._endpointAddres = getAddressFromCert(fs.readFileSync(certPath));
     }
 
-    async deliverMessage(messageSerialized, targetEndpointCertPath, {signatureHashAlgo = 'sha256', id = null, date = null, ttl = 0} = {}) {
+    /**
+     * @param {Message} message
+     * @param {string} targetEndpointCertPath
+     * @param {string} signatureHashAlgo
+     * @param {string|null} id
+     * @param {Date} date
+     * @param {number} ttl
+     * @returns {Promise<void>}
+     */
+    async deliverMessage(message, targetEndpointCertPath, {signatureHashAlgo = 'sha256', id = null, date = null, ttl = 0} = {}) {
+        const payload = this._serializer(message);
         const parcel = await PARCEL_SERIALIZER.serialize(
-            messageSerialized,
+            payload,
             targetEndpointCertPath,
             this.cert,
             this.keyPath,
@@ -31,8 +52,11 @@ class ClientEndpoint {
         await this._pdnClient.deliverParcels([parcel]);
     }
 
+    /**
+     * @returns {AsyncIterableIterator<Message>}
+     */
     async* collectMessages() {
-        const parcelSerializations = this._pdnClient.collectParcels();
+        const parcelSerializations = await this._pdnClient.collectParcels();
         for (const parcelSerialized of parcelSerializations) {
             const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
 
@@ -41,10 +65,11 @@ class ClientEndpoint {
                 break;
             }
 
-            // Also validate the date and expiry of the message. And the signature, if
-            // we don't trust the gateway.
+            // Also validate the date and expiry of the message. And the signature, if we don't trust the gateway.
 
-            yield parcel.decryptPayload(this.keyPath);
+            const payload = parcel.decryptPayload(this.keyPath);
+            const message = this._deserializer(payload);
+            yield message;
         }
     }
 }

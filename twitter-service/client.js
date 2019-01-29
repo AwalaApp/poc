@@ -26,23 +26,17 @@ class TwitterClient {
         this._endpoint = endpoint;
     }
 
-    async postTweet(tweetData) {
-        const tweetError = TweetMessage.verify(tweetData);
-        if (tweetError) {
-            throw tweetError;
-        }
-
-        const message = {credentials: this._credentialsMessage, ...tweetData};
-        const messageSerialized = TweetMessage.encode(message).finish();
+    /**
+     * @param {TweetMessage} tweetMessage
+     * @returns {Promise<void>}
+     */
+    async postTweet(tweetMessage) {
+        tweetMessage.credentials = this._credentialsMessage;
         await this._endpoint.deliverMessage(
-            messageSerialized,
+            tweetMessage,
             TWITTER_API_ENDPOINT_CERT_PATH,
             {ttl: TWEET_TTL_DAYS},
         );
-    }
-
-    * collectMessages() {
-        return this._endpoint.collectMessages();
     }
 }
 

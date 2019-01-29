@@ -11,7 +11,7 @@ const tmp = require('tmp-promise');
 const Twitter = require('twitter-lite');
 const {derCertToPem} = require('../core/_asn1_utils');
 const {getAddressFromCert} = require('../core/pki');
-const {TweetMessage} = require('./service_messages');
+const {deserializeMessage, serializeMessage} = require('./service_messages');
 
 require('dotenv').config();
 
@@ -21,12 +21,24 @@ tmp.setGracefulCleanup();
  * Client-side of the Twitter API adapter endpoint.
  */
 class APIAdapterEndpoint {
+
+    /**
+     * @param {string} certPath
+     * @param {string} keyPath
+     */
     constructor(certPath, keyPath) {
         this._certPath = certPath;
         this._keyPath = keyPath;
     }
 
-    async deliverMessage(messageSerialized, targetEndpointCert, relayEndpoint, parcelDeliveryAuthCert = null) {
+    /**
+     * @param {Message} message
+     * @param {Buffer} targetEndpointCert
+     * @param {string} relayEndpoint
+     * @param {null|Buffer} parcelDeliveryAuthCert
+     * @returns {Promise<void>}
+     */
+    async deliverMessage(message, targetEndpointCert, relayEndpoint, parcelDeliveryAuthCert = null) {
         const {scheme, address} = relayEndpoint.match(/^(?<scheme>[\w+]+):(?<address>.+)$/).groups;
         if (scheme !== 'rneh' && !scheme.startsWith('rneh+')) {
             console.error(`Host endpoints can only deliver parcels to a relaying gateway's PDN host endpoint, so we can't deliver messages to ${relayEndpoint}.`);
@@ -60,25 +72,23 @@ class APIAdapterEndpoint {
             currentEndpointCertPath = await bufferToTmpFile(parcelDeliveryAuthCert);
         }
 
-        const currentEndpoint = new Endpoint(currentEndpointCertPath, this._keyPath, pdnClient);
+        const currentEndpoint = new Endpoint(
+            currentEndpointCertPath,
+            this._keyPath,
+            pdnClient,
+            serializeMessage,
+            deserializeMessage,
+        );
 
         const targetEndpointCertPath = await bufferToTmpFile(targetEndpointCertPem);
         // Note: It's the endpoint's responsibility to retry if the parcel couldn't be delivered.
-        await currentEndpoint.deliverMessage(messageSerialized, targetEndpointCertPath);
+        await currentEndpoint.deliverMessage(message, targetEndpointCertPath);
     }
 }
 
-function processTweet(message) {
-    const invalidTweetError = TweetMessage.verify(message);
-    if (invalidTweetError) {
-        // TODO: Reply with an error contained in a parcel
-        throw invalidTweetError;
-    }
-
-    // NB: In the final implementation, we should actually queue the message and acknowledge its receipt -- instead of doing things synchronously like an RPC!
-    // return callback(null, {});
-
-    const tweetMsg = TweetMessage.decode(message);
+function processTweet(tweetMsg) {
+    // NB: A production implementation should actually queue the message and acknowledge its receipt, instead of
+    // doing things synchronously like an RPC!
 
     const twitterClient = new Twitter({
         subdomain: "api",
@@ -103,13 +113,14 @@ function runServer(netloc, serverCert, serverKey, endpointCertPath, endpointKeyP
 
     backgroundSync(apiAdapter, subscriptionNotifier);
 
-    pogrpcEndpoint.runHost(netloc, serverCert, serverKey, endpointKeyPath, async (message, originEndpointCert, relayingGatewayAddress) => {
-        await processTweet(message);
+    async function routeMessage(message, originEndpointCert, relayingGatewayAddress) {
+        if (message.$type.name === 'Tweet') {
+            await processTweet(message);
+        }
 
-        const tweetMsg = TweetMessage.decode(message);
         subscriptionNotifier.emit(
             'subscription',
-            tweetMsg.credentials,
+            message.credentials,
             originEndpointCert,
 
             // TODO: Replace with the Parcel Delivery Authorization Certificate issued by the target endpoint
@@ -118,7 +129,9 @@ function runServer(netloc, serverCert, serverKey, endpointCertPath, endpointKeyP
 
             relayingGatewayAddress,
         );
-    });
+    }
+
+    pogrpcEndpoint.runHost(netloc, serverCert, serverKey, endpointKeyPath, deserializeMessage, routeMessage);
 }
 
 async function bufferToTmpFile(buffer) {

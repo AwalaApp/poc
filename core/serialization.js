@@ -6,16 +6,20 @@ const cms = require('./_cms');
 const fs = require('fs');
 const uuid4 = require('uuid4');
 const VError = require('verror');
-const {Cargo, Parcel} = require('./messages');
+const {Cargo, Parcel, ServiceMessage} = require('./messages');
 const {getAddressFromCert} = require('./pki');
 const {pemCertToDer} = require('./_asn1_utils');
 
+const MAX_RECIPIENT_ADDRESS_SIZE = (2 ** 16) - 1; // 16-bit, unsigned integer
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer
 const MAX_ID_SIZE = (2 ** 16) - 1; // 16-bit, unsigned integer
 const MAX_DATE_SIZE = (2 ** 32) - 1; // 32-bit, unsigned integer
 const MAX_TTL_SIZE = (2 ** 24) - 1; // 24-bit, unsigned integer
 const MAX_PAYLOAD_SIZE = (2 ** 32) - 1; // 32-bit, unsigned integer
 const MAX_SIGNATURE_SIZE = (2 ** 12) - 1; // 12-bit, unsigned integer
+
+const MAX_SERVICE_MESSAGE_TYPE_SIZE = (2 ** 8) - 1; // 8-bit
+const MAX_SERVICE_MESSAGE_SIZE = (2 ** 32) - 1; // 32-bit
 
 /**
  * Serializer for Relaynet Abstract Message Format v1 (per RS-001).
@@ -62,6 +66,9 @@ class MessageV1Serializer {
         const cert = fs.readFileSync(recipientCertPath);
         const recipientAddress = getAddressFromCert(cert);
         const recipientAddressBuffer = Buffer.from(recipientAddress, 'utf-8');
+        if (MAX_RECIPIENT_ADDRESS_SIZE < recipientAddressBuffer.length) {
+            throw new Error(`Recipient address ${recipientAddress} exceeds ${MAX_RECIPIENT_ADDRESS_SIZE} bytes`);
+        }
         const lengthPrefix = Buffer.allocUnsafe(2);
         lengthPrefix.writeUInt16LE(recipientAddressBuffer.length, 0);
         return Buffer.concat([lengthPrefix, recipientAddressBuffer]);
@@ -125,7 +132,7 @@ class MessageV1Serializer {
     }
 
     static async _serializePayload(payload, recipientCertPath) {
-        // TODO: Support "data" type (i.e., unencrypted payload)
+        // We should also support the CMS "data" type (i.e., unencrypted payload) in production
         const ciphertext = await cms.encrypt(payload, recipientCertPath);
         const length = ciphertext.length;
         if (MAX_PAYLOAD_SIZE < length) {
@@ -153,7 +160,7 @@ class MessageV1Serializer {
     }
 
     /**
-     * @param payload
+     * @param {Buffer} payload
      * @param {string} recipientCertPath Path to the recipient's X.509. Should be a buffer in "real life".
      * @param {Buffer} senderCert
      * @param {string} senderKeyPath
@@ -188,6 +195,10 @@ class MessageV1Serializer {
         return Buffer.concat([partialMessageSerialization, signature]);
     }
 
+    /**
+     * @param {Buffer} buffer
+     * @returns {Promise<RAMFMessage>}
+     */
     async deserialize(buffer) {
         let ast;
         try {
@@ -214,6 +225,49 @@ class MessageV1Serializer {
 
 const CARGO_SERIALIZER = new MessageV1Serializer('C'.charCodeAt(0), 1, Cargo);
 const PARCEL_SERIALIZER = new MessageV1Serializer('P'.charCodeAt(0), 1, Parcel);
+
+/**
+ * @param {ServiceMessage} serviceMessage
+ * @returns {Buffer}
+ */
+function serializeServiceMessage(serviceMessage) {
+    const messageTypeBuffer = Buffer.from(serviceMessage.type, 'utf-8');
+    if (MAX_SERVICE_MESSAGE_TYPE_SIZE < messageTypeBuffer.length) {
+        throw new Error(`Service message type exceeds ${MAX_SERVICE_MESSAGE_TYPE_SIZE} bytes`);
+    }
+    const messageTypeLengthPrefix = Buffer.allocUnsafe(1);
+    messageTypeLengthPrefix.writeUInt8(messageTypeBuffer.length, 0);
+
+    const messageLength = serviceMessage.messageSerialized.length;
+    if (MAX_SERVICE_MESSAGE_SIZE < messageLength) {
+        throw new Error(`Service message exceeds ${MAX_SERVICE_MESSAGE_SIZE} bytes`);
+    }
+    const messageLengthPrefix = Buffer.allocUnsafe(4);
+    messageLengthPrefix.writeUInt32LE(messageLength, 0);
+
+    return Buffer.concat([
+        messageTypeLengthPrefix,
+        messageTypeBuffer,
+        messageLengthPrefix,
+        serviceMessage.messageSerialized,
+    ]);
+}
+
+/**
+ * @param {Buffer} serviceMessageSerialized
+ * @returns {ServiceMessage}
+ */
+function deserializeServiceMessage(serviceMessageSerialized) {
+    const payloadParser = new BParser()
+        .endianess('little')
+        .uint8('messageTypeLength')
+        .string('messageType', {length: 'messageTypeLength'})
+        .uint32('messageLength')
+        .buffer('message', {length: 'messageLength'})
+    ;
+    const ast = payloadParser.parse(serviceMessageSerialized);
+    return new ServiceMessage(ast.message, ast.messageType);
+}
 
 function serializeCargoPayload(...parcels) {
     // Needless to say the final implementation won't be loading everything in memory
@@ -244,6 +298,8 @@ function deserializeCargoPayload(payload) {
 module.exports = {
     CARGO_SERIALIZER,
     PARCEL_SERIALIZER,
+    serializeServiceMessage,
+    deserializeServiceMessage,
     serializeCargoPayload,
     deserializeCargoPayload,
 };

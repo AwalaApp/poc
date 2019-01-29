@@ -8,7 +8,7 @@ const yargs = require('yargs');
 const {CARGO_SERIALIZER, PARCEL_SERIALIZER} = require('../core/serialization');
 const {Cargo} = require('../core/messages');
 const {derCertToPem} = require('../core/_asn1_utils');
-const {deserializeCargoPayload} = require('../core/serialization');
+const {deserializeCargoPayload, deserializeServiceMessage} = require('../core/serialization');
 const {getAddressFromCert} = require('../core/pki');
 
 const SERIALIZER_BY_TAG = {
@@ -33,9 +33,8 @@ async function main(argv) {
     if (argv.recipientKey) {
         const payloadDecrypted = await message.decryptPayload(argv.recipientKey);
 
-        console.log('  Decrypted:');
-
         if (message instanceof Cargo) {
+            console.log('  Decrypted:');
             const parcelsSerialized = deserializeCargoPayload(payloadDecrypted);
             for (let parcelSerialized of parcelsSerialized) {
                 console.log(`    Parcel:`);
@@ -43,8 +42,13 @@ async function main(argv) {
                 console.log(formatMessageInfo(parcel, true))
             }
         } else {
-            const payloadOutput = (argv.decodePayload) ? payloadDecrypted.toString('utf-8') : payloadDecrypted;
-            console.log(payloadOutput);
+            // It's a parcel
+            const serviceMessage = deserializeServiceMessage(payloadDecrypted);
+            console.log('  Service message:');
+            console.log(`    Type: ${serviceMessage.type}`);
+            if (argv.decodePayload) {
+                console.log('    Content:', serviceMessage.messageSerialized.toString('utf-8'));
+            }
         }
     }
 }

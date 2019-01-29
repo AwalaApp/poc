@@ -20,25 +20,24 @@ const pogrpcPackage = grpc.loadPackageDefinition(pogrpcPackageDefinition).relayn
  * @param {Buffer} serverCert PEM-encoded X.509 cert for the HTTP server
  * @param {Buffer} serverKey PEM-encoded private key for `serverCert`
  * @param {string} endpointKeyPath
- * @param messageProcessor Function to call with each message extracted from a parcel
+ * @param {function(Buffer): Message} messageDeserializer
+ * @param {function(Message, Buffer, string)} messageProcessor Function to call with the message extracted from a parcel
  */
-function runHost(netloc, serverCert, serverKey, endpointKeyPath, messageProcessor) {
+function runHost(netloc, serverCert, serverKey, endpointKeyPath, messageDeserializer, messageProcessor) {
     const server = new grpc.Server();
     server.addService(pogrpcPackage.PogRPC.service, {
         deliverParcels(call) {
             // Zero or one gateway must be present. Multiple values MUST be rejected in production.
-            const relayingGatewayAddress = (call.metadata.get('Gateway') || [null])[0];
+            const relayingGatewayAddress = (call.metadata.get('Gateway') || [null])[0].toString();
 
             call.on('data', async function (parcelDelivery) {
                 const parcel = await PARCEL_SERIALIZER.deserialize(parcelDelivery.parcel);
 
                 // Pretend the parcel labels were successfully validated at this point.
 
-                await messageProcessor(
-                    await parcel.decryptPayload(endpointKeyPath),
-                    parcel.senderCert,
-                    relayingGatewayAddress,
-                );
+                const parcelPayload = await parcel.decryptPayload(endpointKeyPath);
+                const message = messageDeserializer(parcelPayload);
+                await messageProcessor(message, parcel.senderCert, relayingGatewayAddress);
 
                 call.write({id: parcelDelivery.id}); // ACK
             });

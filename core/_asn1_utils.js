@@ -1,5 +1,9 @@
 'use strict';
 
+/**
+ * @param {Buffer} pemBuffer
+ * @return {Buffer}
+ */
 function pemCertToDer(pemBuffer) {
     const oneliner = pemBuffer
         .toString()
@@ -7,6 +11,10 @@ function pemCertToDer(pemBuffer) {
     return Buffer.from(oneliner, 'base64');
 }
 
+/**
+ * @param {Buffer} derBuffer
+ * @return {Buffer}
+ */
 function derCertToPem(derBuffer) {
     const lines = derBuffer.toString('base64').match(/.{1,64}/g);
     const pemString = [
