@@ -73,7 +73,7 @@ First of all, set up your environment:
    TWITTER_ACCESS_TOKEN_KEY='<your-access-token-key>'
    TWITTER_ACCESS_TOKEN_SECRET='<your-access-token-secret>'
    ```
-1. Now start the gateways amd the Twitter API adapter, preferably in separate terminal sessions so you can see what's happening at all times: `bin/user-gateway`, `bin/relayer-gateway` and `bin/twitter-api-adapter`.
+1. Now start the gateways and the Twitter API adapter, preferably in separate terminal sessions so you can see what's happening at all times: `bin/user-gateway`, `bin/relayer-gateway` and `bin/twitter-api-adapter`.
 
 At this point you're ready to see Relaynet in action. You can do the following, for example:
 
