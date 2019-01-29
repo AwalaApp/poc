@@ -70,7 +70,7 @@ class MessageV1Serializer {
     static _serializeSignatureHashAlgo(hashAlgo) {
         const hashAlgoBuffer = Buffer.alloc(8); // Zero-filled per spec
         // Don't truncate silently in the final implementation
-        hashAlgoBuffer.write(hashAlgo, 'ascii');
+        hashAlgoBuffer.write(hashAlgo, 0, 8, 'ascii');
         return hashAlgoBuffer;
     }
 
