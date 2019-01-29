@@ -88,7 +88,7 @@ class APIAdapterEndpoint {
 
 function processTweet(tweetMsg) {
     // NB: A production implementation should actually queue the message and acknowledge its receipt, instead of
-    // doing things synchronously like an RPC!
+    // doing things in band like an RPC!
 
     const twitterClient = new Twitter({
         subdomain: "api",
