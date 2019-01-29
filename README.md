@@ -64,15 +64,15 @@ First of all, set up your environment:
 1. Map `twitter-3rd-party-endpoint.example.com` to the local loopback (`127.0.0.1`). On Linux this can be done by adding an entry to `/etc/hosts`.
 1. [Register an OAuth app on Twitter](https://apps.twitter.com/).
 1. Add a `.env` file to the root of the repo with the following content:
-```
-# From the Twitter OAuth app
-TWITTER_CONSUMER_KEY='<your-consumer-key>'
-TWITTER_CONSUMER_SECRET='<your-consumer-secret>'
-
-# From the Twitter client
-TWITTER_ACCESS_TOKEN_KEY='<your-access-token-key>'
-TWITTER_ACCESS_TOKEN_SECRET='<your-access-token-secret>'
-```
+   ```
+   # From the Twitter OAuth app
+   TWITTER_CONSUMER_KEY='<your-consumer-key>'
+   TWITTER_CONSUMER_SECRET='<your-consumer-secret>'
+   
+   # From the Twitter client
+   TWITTER_ACCESS_TOKEN_KEY='<your-access-token-key>'
+   TWITTER_ACCESS_TOKEN_SECRET='<your-access-token-secret>'
+   ```
 1. Now start the gateways amd the Twitter API adapter, preferably in separate terminal sessions so you can see what's happening at all times: `bin/user-gateway`, `bin/relayer-gateway` and `bin/twitter-api-adapter`.
 
 At this point you're ready to see Relaynet in action. You can do the following, for example:
