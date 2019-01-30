@@ -1,4 +1,4 @@
-[![Gitter chat](https://badges.gitter.im/relaynet/poc.png)](https://gitter.im/relaynet/poc)
+[![Gitter chat](https://badges.gitter.im/relaynet/community.png)](https://gitter.im/relaynet/community)
 
 # Relaynet's Proof of Concept
 
