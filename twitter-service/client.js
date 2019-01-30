@@ -2,7 +2,7 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const path = require('path');
-const {UpdateSubscription, TwitterCredentials, TweetMessage} = require('./service_messages');
+const {UpdateSubscription, TwitterCredentials, Tweet} = require('./service_messages');
 
 // Clients still have to ship with the target endpoint's certificate in production.
 // This is just an initial certificate and it can be rotated subsequently, after
@@ -27,7 +27,7 @@ class TwitterClient {
     }
 
     /**
-     * @param {TweetMessage} tweetMessage
+     * @param {Tweet} tweetMessage
      * @returns {Promise<void>}
      */
     async postTweet(tweetMessage) {

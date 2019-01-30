@@ -10,7 +10,7 @@ const os = require('os');
 const readline = require('readline');
 const TwitterClient = require('../twitter-service/client');
 const {getAddressFromCert} = require('../core/pki');
-const {TweetMessage, deserializeMessage, serializeMessage} = require('../twitter-service/service_messages');
+const {Tweet, deserializeMessage, serializeMessage} = require('../twitter-service/service_messages');
 
 require('dotenv').config();
 
@@ -45,7 +45,7 @@ async function main() {
 
     const tweetStatus = await promptTweetStatus();
     if (tweetStatus) {
-        const tweet = TweetMessage.create({status: tweetStatus});
+        const tweet = Tweet.create({status: tweetStatus});
         await twitterClient.postTweet(tweet);
         console.log('✔️ Tweet added to queue.')
     }

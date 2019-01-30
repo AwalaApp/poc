@@ -2,7 +2,7 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const Twitter = require('twitter-lite');
-const {TimelineUpdateBatch, TweetMessage} = require('./service_messages');
+const {TimelineUpdateBatch, Tweet} = require('./service_messages');
 
 require('dotenv').config();
 
@@ -92,7 +92,7 @@ class User {
         const tweets = await this._getHomeTimeline();
         const tweetMessages = [];
         for (const tweet of tweets) {
-            const tweetMsg = TweetMessage.create({
+            const tweetMsg = Tweet.create({
                 id: tweet.id_str,
                 creationDate: new Date(tweet.created_at),
                 status: tweet.text,

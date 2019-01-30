@@ -14,7 +14,7 @@ const TwitterCredentials = root.lookupType('twitter.relaynet_poc.TwitterCredenti
  * @type {Type}
  * @extends {Message}
  */
-const TweetMessage = root.lookupType('twitter.relaynet_poc.Tweet');
+const Tweet = root.lookupType('twitter.relaynet_poc.Tweet');
 
 /**
  * @type {Type}
@@ -66,7 +66,7 @@ module.exports = {
     deserializeMessage,
     serializeMessage,
     TimelineUpdateBatch,
-    TweetMessage,
+    Tweet,
     TwitterCredentials,
     UpdateSubscription,
 };
