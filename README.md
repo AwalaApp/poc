@@ -1,3 +1,5 @@
+[![Gitter chat](https://badges.gitter.im/relaynet/poc.png)](https://gitter.im/relaynet.poc)
+
 # Relaynet's Proof of Concept
 
 This monorepo implements a proof of concept of Twitter running on [Relaynet](https://relaynet.link). It allows you to post tweets like the one below and get the latest entries from your home timeline -- And thanks to the use of messaging, the server can simply push those updates without the app having to do polling.
