@@ -4,7 +4,9 @@
 
 const Endpoint = require('../core/endpoint');
 const fs = require('fs');
+const path = require('path');
 const PogRPCClient = require('../PogRPC/client');
+const os = require('os');
 const readline = require('readline');
 const TwitterClient = require('../twitter-service/client');
 const {getAddressFromCert} = require('../core/pki');
@@ -12,11 +14,14 @@ const {TweetMessage, deserializeMessage, serializeMessage} = require('../twitter
 
 require('dotenv').config();
 
-const CERT_PATH = __dirname + '/../certs/twitter-app.cert.pem';
-const KEY_PATH = __dirname + '/../certs/twitter-app.key.pem';
+const CERTS_DIR_PATH = path.join(path.dirname(__dirname), 'certs');
+const CERT_PATH = path.join(CERTS_DIR_PATH, 'twitter-app.cert.pem');
+const KEY_PATH = path.join(CERTS_DIR_PATH, 'twitter-app.key.pem');
 
 const GATEWAY_ADDRESS = '127.0.0.1:1473';
 const ENDPOINT_ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
+
+const APP_FIRST_RUN_FILE_PATH = path.join(os.tmpdir(), 'twitter-app-first-run');
 
 async function main() {
     const pdnClient = new PogRPCClient(GATEWAY_ADDRESS, ENDPOINT_ADDRESS, false); // MUST only use TLS in production
@@ -27,11 +32,16 @@ async function main() {
         endpoint,
     );
 
-    await twitterClient.subscribeToTimeline();
+    if (fs.existsSync(APP_FIRST_RUN_FILE_PATH)) {
+        console.log(`You were subscribed to updates to your timeline. Remove ${APP_FIRST_RUN_FILE_PATH} to resubscribe.`);
+    } else {
+        await twitterClient.subscribeToUpdates();
+        fs.writeFileSync(APP_FIRST_RUN_FILE_PATH, '');
+        console.log(`You'll be subscribed to updates in the next relay.`);
+    }
+    console.log();
 
     await printCollectedMessages(endpoint.collectMessages());
-
-    console.log('');
 
     const tweetStatus = await promptTweetStatus();
     if (tweetStatus) {
@@ -62,18 +72,22 @@ async function printCollectedMessages(messages) {
     console.log('New Tweets:');
     let anyTweet;
     for await (const message of messages) {
-        if (message.$type.name !== 'Tweet') {
-            console.warn(`${message} was received but it isn't a tweet`);
+        if (message.$type.name !== 'TimelineUpdateBatch') {
+            console.warn(`${message} was received but it isn't a timeline update`);
             break;
         }
 
-        console.log(`- ${message.author} said: ${message.status}`);
-        anyTweet = true;
+        for (const tweetMsg of message.tweets) {
+            console.log(`- ${tweetMsg.author} said "${tweetMsg.status}"`);
+            anyTweet = true;
+        }
     }
 
     if (!anyTweet) {
         console.log('(no new tweets)')
     }
+
+    console.log('');
 }
 
 (async () => await main())();

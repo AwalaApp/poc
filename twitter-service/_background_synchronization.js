@@ -2,7 +2,7 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const Twitter = require('twitter-lite');
-const {TweetMessage} = require('./service_messages');
+const {TimelineUpdateBatch, TweetMessage} = require('./service_messages');
 
 require('dotenv').config();
 
@@ -14,10 +14,11 @@ const POLLING_FREQUENCY_SECONDS = 90;
  * @returns {Promise<void>}
  */
 async function main(apiAdapter, subscriptionNotifier) {
+    console.log(`[background-sync] Will check for updates every ${POLLING_FREQUENCY_SECONDS} seconds.`);
     const users = {};
 
     function subscribeUser(twitterCredentials, targetEndpointCert, parcelDeliveryAuthCert, relayEndpoint) {
-        console.log('Got new user subscription');
+        console.log('[background-sync] Got new user subscription');
         let user = users[twitterCredentials.accessTokenKey];
         if (!user) {
             user = new User(twitterCredentials.accessTokenKey, twitterCredentials.accessTokenSecret);
@@ -33,7 +34,7 @@ async function main(apiAdapter, subscriptionNotifier) {
         await sleep(POLLING_FREQUENCY_SECONDS);
 
         for (const user of Object.values(users)) {
-            console.log('Checking updates...');
+            console.log('[background-sync] Checking updates...');
             await user.deliverUpdates(apiAdapter);
         }
     }
@@ -72,6 +73,8 @@ class User {
         this._accessTokenKey = accessTokenKey;
         this._accessTokenSecret = accessTokenSecret;
         this._endpointSubscriptions = [];
+
+        this._lastTweetId = null;
     }
 
     /**
@@ -87,13 +90,19 @@ class User {
      */
     async deliverUpdates(apiAdapter) {
         const tweets = await this._getHomeTimeline();
+        const tweetMessages = [];
         for (const tweet of tweets) {
             const tweetMsg = TweetMessage.create({
+                id: tweet.id_str,
                 creationDate: new Date(tweet.created_at),
                 status: tweet.text,
                 author: `@${tweet.user.screen_name}`,
             });
-            await this._deliverMessage(tweetMsg, apiAdapter);
+            tweetMessages.push(tweetMsg);
+        }
+        if (0 < tweetMessages.length) {
+            this._lastTweetId = tweetMessages[0].id;
+            await this._deliverMessage(TimelineUpdateBatch.create({tweets: tweetMessages}), apiAdapter);
         }
     }
 
@@ -120,7 +129,11 @@ class User {
             access_token_key: this._accessTokenKey,
             access_token_secret: this._accessTokenSecret,
         });
-        return await twitterClient.get('statuses/home_timeline');
+        const options = {count: 3};
+        if (this._lastTweetId) {
+            options.since_id = this._lastTweetId;
+        }
+        return await twitterClient.get('statuses/home_timeline', options);
     }
 }
 

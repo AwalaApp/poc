@@ -20,7 +20,13 @@ const TweetMessage = root.lookupType('twitter.relaynet_poc.Tweet');
  * @type {Type}
  * @extends {Message}
  */
-const HomeTimelineSubscription = root.lookupType('twitter.relaynet_poc.HomeTimelineSubscription');
+const UpdateSubscription = root.lookupType('twitter.relaynet_poc.UpdateSubscription');
+
+/**
+ * @type {Type}
+ * @extends {Message}
+ */
+const TimelineUpdateBatch = root.lookupType('twitter.relaynet_poc.TimelineUpdateBatch');
 
 /**
  * @param {Message} message
@@ -57,9 +63,10 @@ function deserializeMessage(messageSerialized) {
 }
 
 module.exports = {
-    HomeTimelineSubscription,
-    TwitterCredentials,
-    TweetMessage,
     deserializeMessage,
     serializeMessage,
+    TimelineUpdateBatch,
+    TweetMessage,
+    TwitterCredentials,
+    UpdateSubscription,
 };

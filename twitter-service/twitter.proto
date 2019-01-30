@@ -17,12 +17,18 @@ message Tweet {
 
     google.protobuf.Timestamp creation_date = 2;
 
-    // "status" is what Twitter calls the content of the tweet
+    // AKA "text"
     string status = 3;
 
     string author = 4;
+
+    string id = 5;
 }
 
-message HomeTimelineSubscription {
+message UpdateSubscription {
     TwitterCredentials credentials = 1;
+}
+
+message TimelineUpdateBatch {
+    repeated Tweet tweets = 1;
 }

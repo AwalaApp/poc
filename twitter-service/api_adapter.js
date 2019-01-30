@@ -118,7 +118,7 @@ function runServer(netloc, serverCert, serverKey, endpointCertPath, endpointKeyP
             case 'Tweet':
                 await processTweet(message);
                 break;
-            case 'HomeTimelineSubscription':
+            case 'UpdateSubscription':
                 subscriptionNotifier.emit(
                     'subscription',
                     message.credentials,
