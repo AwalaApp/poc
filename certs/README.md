@@ -1,6 +1,6 @@
 # X.509 Certificates and Private Keys
 
-This directory contains all the certificates and corresponding private keys used by the nodes in this PoC (see [bin/](../bin/)).
+This directory contains all the certificates and corresponding private keys used by the nodes in this PoC (see [bin/](../bin)).
 
 All the certificates are self-signed and the private keys are under version control to make it easier to try this proof of concept.
 

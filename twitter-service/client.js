@@ -2,7 +2,7 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const path = require('path');
-const {TwitterCredentials, TweetMessage} = require('./service_messages');
+const {HomeTimelineSubscription, TwitterCredentials, TweetMessage} = require('./service_messages');
 
 // Clients still have to ship with the target endpoint's certificate in production.
 // This is just an initial certificate and it can be rotated subsequently, after
@@ -37,6 +37,14 @@ class TwitterClient {
             TWITTER_API_ENDPOINT_CERT_PATH,
             {ttl: TWEET_TTL_DAYS},
         );
+    }
+
+    /**
+     * @return {Promise<void>}
+     */
+    async subscribeToTimeline() {
+        const message = HomeTimelineSubscription.create({credentials: this._credentialsMessage});
+        await this._endpoint.deliverMessage(message, TWITTER_API_ENDPOINT_CERT_PATH);
     }
 }
 

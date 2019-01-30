@@ -5,7 +5,7 @@
 
 const grpc = require('grpc');
 const grpcProtoLoader = require('@grpc/proto-loader');
-const {createHash} = require('crypto');
+const {deliverParcels} = require('./_streaming');
 
 const pogrpcPackageDefinition = grpcProtoLoader.loadSync(
     __dirname + '/pogrpc.proto',
@@ -32,54 +32,14 @@ class PogRPCClient {
     }
 
     /**
-     * @param {Iterable<Parcel>} parcels
+     * @param {Array<Object<{id: string, parcel: Buffer}>>} parcelsSerialized
      * @returns {Promise<void>}
      */
-    deliverParcels(parcels) {
-        // The final implementation should actually work with streams instead of loading everything in
-        // memory and doing so much stuff synchronously.
-
-        const sentParcelIds = new Set();
-        let allParcelsSent = false;
-
-        return new Promise((resolve, reject) => {
-            const call = this._grpcClient.deliverParcels(this._grpcMetadata);
-
-            call.on('data', function (deliveryAck) {
-                if (!sentParcelIds.has(deliveryAck.id)) {
-                    call.end();
-                    reject(new Error(`Got ACK for unknown parcel (${deliveryAck.id})`));
-                    return;
-                }
-
-                sentParcelIds.delete(deliveryAck.id);
-
-                if (sentParcelIds.size === 0 && allParcelsSent) {
-                    call.end();
-                    resolve();
-                }
-            });
-
-            call.on('error', reject);
-
-            call.on('end', function () {
-                call.end();
-            });
-
-            for (let parcel of parcels) {
-                const parcelId = createHash('sha1').update(parcel).digest('hex');
-                call.write({id: parcelId, parcel});
-                sentParcelIds.add(parcelId);
-            }
-            allParcelsSent = true;
-
-            setTimeout(() => {
-                call.end();
-                reject(new Error('Timed out'));
-                // This should be propagated to the app in the final implementation so
-                // it can queue a retry for the unacknowledged parcels if necessary
-            }, 2000);
-        });
+    async deliverParcels(parcelsSerialized) {
+        const call = this._grpcClient.deliverParcels(this._grpcMetadata, {deadline: new Date(Date.now() + 20000)});
+        // In production, this function should also be a generator that yields the id
+        // of each parcel that's acknowledged by the server.
+        await deliverParcels(parcelsSerialized, call);
     }
 
     /**

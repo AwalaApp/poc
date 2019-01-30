@@ -17,6 +17,7 @@ async function main(apiAdapter, subscriptionNotifier) {
     const users = {};
 
     function subscribeUser(twitterCredentials, targetEndpointCert, parcelDeliveryAuthCert, relayEndpoint) {
+        console.log('Got new user subscription');
         let user = users[twitterCredentials.accessTokenKey];
         if (!user) {
             user = new User(twitterCredentials.accessTokenKey, twitterCredentials.accessTokenSecret);

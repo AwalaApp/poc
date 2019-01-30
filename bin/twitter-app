@@ -27,6 +27,8 @@ async function main() {
         endpoint,
     );
 
+    await twitterClient.subscribeToTimeline();
+
     await printCollectedMessages(endpoint.collectMessages());
 
     console.log('');
@@ -60,7 +62,7 @@ async function printCollectedMessages(messages) {
     console.log('New Tweets:');
     let anyTweet;
     for await (const message of messages) {
-        if (!(message instanceof TweetMessage)) {
+        if (message.$type.name !== 'Tweet') {
             console.warn(`${message} was received but it isn't a tweet`);
             break;
         }

@@ -22,3 +22,7 @@ message Tweet {
 
     string author = 4;
 }
+
+message HomeTimelineSubscription {
+    TwitterCredentials credentials = 1;
+}

@@ -28,6 +28,11 @@ const KEY_PATH = path.join(CERTS_DIR_PATH, 'relayer-gateway.key.pem');
 const GATEWAY_CRN_ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
 const GATEWAY_PDN_ADDRESS = `rneh+grpc:${POGRPC_NETLOC}`;
 
+// This is *WRONG*. The the relaying gateway MUST take the target gateway's certificate from the
+// Cargo Collection Authorization (CCA), which MUST be attached to the request to collect cargo.
+// However, this PoC doesn't (yet) support CCAs, so we can't extract the certificate from any CCA.
+const USER_GW_CERT_PATH = path.join(CERTS_DIR_PATH, 'user-gateway.cert.pem');
+
 // We're whitelisting the self-signed cert for the API endpoint's gRPC server for expediency, but this MUST NOT be
 // done in production.
 const TWITTER_API_ENDPOINT_SERVER_CERT = fs.readFileSync(path.join(
@@ -40,8 +45,9 @@ function main() {
     fs.mkdirSync(CRN_PARCELS_DIR_PATH, {recursive: true});
 
     const parcelNotifier = new EventEmitter();
-    parcelNotifier.on('crn', deliverCrnParcel);
     parcelNotifier.on('pdn', deliverPndParcel);
+    parcelNotifier.on('crn', deliverCrnParcel);
+    parcelNotifier.on('crnCollection', ackCrnParcelCollection);
 
     cosocketServer(COSOCKET_PATH, CERT_PATH, KEY_PATH, parcelNotifier, fetchCargoesPayloads);
     pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier);
@@ -98,7 +104,7 @@ async function deliverCrnParcel(parcelSerialized) {
         TWITTER_API_ENDPOINT_SERVER_CERT, // Don't do in production
     );
     try {
-        await pdnClient.deliverParcels([parcelSerialized]);
+        await pdnClient.deliverParcels([{id, parcel: parcelSerialized}]);
     } catch (error) {
         // We should retry in production, depending on the type of error.
         console.error(`Could not deliver parcel ${id} to ${recipient}:`, error.toString());
@@ -129,13 +135,43 @@ async function deliverPndParcel(parcelSerialized) {
  *
  * The function is a generator and takes the target gateway addresses as input because the generic code
  * in the CRN server should be agnostic of the storage medium. This implementation uses the file system,
- * but a relayer's gateway could use S3 or a DB to store the parcels, for example.
+ * but a relaying gateway could use S3 or a DB to store the parcels, for example.
  *
  * @param {Array<string>} gatewayAddresses
- * @returns {AsyncIterableIterator<{gatewayAddress: string, parcels}>}
+ * @returns {AsyncIterableIterator<{gatewayCertPath: string, parcels}>}
  */
 async function* fetchCargoesPayloads(gatewayAddresses) {
-    console.warn('fetchCargoesPayloads is not implemented yet');
+    // This PoC doesn't support Cargo Collection Authorizations (CCAs), so there's nothing we can do with
+    // gatewayAddresses. In production, we MUST only yield cargo for addresses in gatewayAddresses.
+    // In other words, all the cargo will be encrypted using the user's gateway's certificate.
+
+    const parcelFileNames = fs.readdirSync(CRN_PARCELS_DIR_PATH).map(f => path.join(CRN_PARCELS_DIR_PATH, f));
+
+    if (parcelFileNames.length === 0) {
+        return;
+    }
+
+    const parcels = {};
+    for (const parcelFileName of parcelFileNames) {
+        // Use fs.createReadStream() in production.
+        parcels[parcelFileName] = fs.readFileSync(parcelFileName);
+    }
+    yield {
+        gatewayCertPath: USER_GW_CERT_PATH, // Again, we MUSTN'T do this, but the PoC doesn't support CCAs
+        parcels,
+    };
+}
+
+function ackCrnParcelCollection(parcelId) {
+    // In this case, the parcelId is the path on disk, but it could be an S3 object URL
+    // or a DB PK (if the parcel is stored in a DB), for example. This scenario is likely
+    // with a relayer gateway.
+
+    // We should check that the path actually corresponds to a collected parcel in
+    // production.
+
+    console.log(`[CRN] Cargo containing parcel ${parcelId} was collected. The parcel will be removed.`);
+    fs.unlinkSync(parcelId);
 }
 
 main();

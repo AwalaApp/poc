@@ -39,7 +39,7 @@ class ClientEndpoint {
      */
     async deliverMessage(message, targetEndpointCertPath, {signatureHashAlgo = 'sha256', id = null, date = null, ttl = 0} = {}) {
         const payload = this._serializer(message);
-        const parcel = await PARCEL_SERIALIZER.serialize(
+        const parcelSerialized = await PARCEL_SERIALIZER.serialize(
             payload,
             targetEndpointCertPath,
             this.cert,
@@ -49,7 +49,7 @@ class ClientEndpoint {
             date,
             ttl,
         );
-        await this._pdnClient.deliverParcels([parcel]);
+        await this._pdnClient.deliverParcels([{id, parcel: parcelSerialized}]);
     }
 
     /**
@@ -67,7 +67,7 @@ class ClientEndpoint {
 
             // Also validate the date and expiry of the message. And the signature, if we don't trust the gateway.
 
-            const payload = parcel.decryptPayload(this.keyPath);
+            const payload = await parcel.decryptPayload(this.keyPath);
             const message = this._deserializer(payload);
             yield message;
         }

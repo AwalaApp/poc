@@ -88,6 +88,10 @@ async function collectCargoes(client, keyPath, parcelNotifier) {
 }
 
 async function deliverCargoes(client, cargoPayloadFetcher, certPath, keyPath, parcelNotifier) {
+    // NB: There's one pretty significant omission in this PoC: The client MUST provide one Cargo Collection Authorization
+    // for each gateway it's representing. That must be part of the "collect cargo" intent packet, and
+    // it must be verified before calling cargoPayloadFetcher().
+
     const stream = new CargoDeliveryStream(client);
     const collectedParcelsByCargoId = {};
 
@@ -98,11 +102,12 @@ async function deliverCargoes(client, cargoPayloadFetcher, certPath, keyPath, pa
     });
     stream.init();
 
-    for await (const {gatewayAddress, parcels} of cargoPayloadFetcher(['rngo:03050d7491283a75fb4b1cc4141bcf863'])) {
+    const gatewayAddresses = []; // Only those whose Cargo Collection Authorizations (CCAs) were valid.
+    for await (const {gatewayCertPath, parcels} of cargoPayloadFetcher(gatewayAddresses)) {
         const cargoPayload = serializeCargoPayload(...Object.values(parcels));
         const cargoSerialized = await CARGO_SERIALIZER.serialize(
             cargoPayload,
-            __dirname + '/../certs/relayer-gateway.cert.pem',
+            gatewayCertPath, // Workaround until CCAs are supported.
             fs.readFileSync(certPath),
             keyPath,
         );

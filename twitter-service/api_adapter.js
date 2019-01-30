@@ -114,21 +114,27 @@ function runServer(netloc, serverCert, serverKey, endpointCertPath, endpointKeyP
     backgroundSync(apiAdapter, subscriptionNotifier);
 
     async function routeMessage(message, originEndpointCert, relayingGatewayAddress) {
-        if (message.$type.name === 'Tweet') {
-            await processTweet(message);
+        switch (message.$type.name) {
+            case 'Tweet':
+                await processTweet(message);
+                break;
+            case 'HomeTimelineSubscription':
+                subscriptionNotifier.emit(
+                    'subscription',
+                    message.credentials,
+                    originEndpointCert,
+
+                    // TODO: Replace with the Parcel Delivery Authorization Certificate issued by the target endpoint
+                    // for the Twitter API endpoint.
+                    fs.readFileSync(endpointCertPath),
+
+                    relayingGatewayAddress,
+                );
+                break;
+            default:
+                console.error('Cannot route message type:', message.$type.name);
+                break;
         }
-
-        subscriptionNotifier.emit(
-            'subscription',
-            message.credentials,
-            originEndpointCert,
-
-            // TODO: Replace with the Parcel Delivery Authorization Certificate issued by the target endpoint
-            // for the Twitter API endpoint.
-            fs.readFileSync(endpointCertPath),
-
-            relayingGatewayAddress,
-        );
     }
 
     pogrpcEndpoint.runHost(netloc, serverCert, serverKey, endpointKeyPath, deserializeMessage, routeMessage);

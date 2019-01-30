@@ -32,15 +32,17 @@ const RELAYER_GW_ADDRESS = getAddressFromCert(fs.readFileSync(RELAYER_GW_CERT_PA
 
 function main() {
     fs.mkdirSync(DATA_DIR_PATH, {recursive: true});
+    fs.mkdirSync(PDN_PARCELS_DIR_PATH, {recursive: true});
     fs.mkdirSync(CRN_PARCELS_DIR_PATH, {recursive: true});
 
     const parcelNotifier = new EventEmitter();
-    parcelNotifier.on('crn', deliverCrnParcel);
     parcelNotifier.on('pdn', deliverPndParcel);
+    parcelNotifier.on('pdnCollection', ackPdnParcelCollection);
+    parcelNotifier.on('crn', deliverCrnParcel);
     parcelNotifier.on('crnCollection', ackCrnParcelCollection);
 
     cosocketServer(COSOCKET_SOCKET_PATH, CERT_PATH, KEY_PATH, parcelNotifier, fetchCargoesPayloads);
-    pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier);
+    pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier, collectPdnParcels);
 
     console.log(`Running user's gateway ${ADDRESS}
 
@@ -62,21 +64,20 @@ PDN:
  * is an endpoint listening on a network address (using a parcel delivery binding like PogRPC), as opposed
  * to a private endpoint (which has an opaque address).
  *
- * The production-ready equivalent of this function would be different in multiple ways. For example:
- *
- * - It should support multiple parcel delivery bindings, not just PogRPC.
- * - Whatever the binding, it should _queue_ the delivery, not do it in band.
- * - It should support parcels sent to private endpoints (those with opaque addresses). This is necessary
- *   if the gateway is serving an individual user (and their private endpoints), but it's unlikely to be
- *   necessary when the gateway is serving a relayer (unless the relayer chooses to expose private endpoints).
- *
  * @param parcelSerialized
  * @returns {Promise<void>}
  */
 async function deliverCrnParcel(parcelSerialized) {
-    const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
-    console.log(`[CRN] Received parcel ${id} for ${recipient}`);
-    throw new Error('unimplemented');
+    const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
+
+    const hash = createHash('sha256');
+    hash.update(parcel.senderCert);
+    hash.update(parcel.id);
+    const internalParcelId = hash.digest('hex');
+
+    const parcelPath = path.join(PDN_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
+    fs.writeFileSync(parcelPath, parcelSerialized);
+    console.log(`[CRN] Added parcel ${parcel.id} to PDN queue.`);
 }
 
 async function deliverPndParcel(parcelSerialized) {
@@ -92,6 +93,28 @@ async function deliverPndParcel(parcelSerialized) {
     console.log(`[PDN] Added parcel ${parcel.id} to CRN queue.`);
 }
 
+function ackPdnParcelCollection(parcelId) {
+    // In this case, the parcelId is the path on disk, but it could be an S3 object URL
+    // or a DB PK (if the parcel is stored in a DB), for example. This scenario is likely
+    // with a relayer gateway.
+
+    // We should check that the path actually corresponds to a collected parcel in
+    // production.
+
+    console.log(`[PDN] Parcel ${parcelId} was collected and will be removed.`);
+    fs.unlinkSync(parcelId);
+}
+
+async function* collectPdnParcels() {
+    const parcelFileNames = fs.readdirSync(PDN_PARCELS_DIR_PATH)
+        .map(f => path.join(PDN_PARCELS_DIR_PATH, f));
+
+    for (const parcelFileName of parcelFileNames) {
+        // Use fs.createReadStream() in production.
+        yield {id: parcelFileName, parcel: fs.readFileSync(parcelFileName)};
+    }
+}
+
 /**
  * Return all the parcels that should be relayed in a single cargo.
  *
@@ -103,15 +126,16 @@ async function deliverPndParcel(parcelSerialized) {
  * but a relayer's gateway could use S3 or a DB to store the parcels, for example.
  *
  * @param {Array<string>} gatewayAddresses
- * @returns {AsyncIterableIterator<{gatewayAddress: string, parcels}>}
+ * @returns {AsyncIterableIterator<{gatewayCertPath: string, parcels}>}
  */
 async function* fetchCargoesPayloads(gatewayAddresses) {
-    // Because this is the user's gateway, the relayer's gateway is the only recipient of the cargo.
-    // Any other target gateway is ignored.
-    if (!gatewayAddresses.includes(RELAYER_GW_ADDRESS)) {
-        console.warn("[CRN] Ignoring parcel collection request because it isn't for our relayer");
-        return;
-    }
+    // The following must be in place in production. This PoC doesn't support Cargo Collection Authorizations (CCAs).
+    // if (!gatewayAddresses.includes(RELAYER_GW_ADDRESS)) {
+    //     // Because this is the user's gateway, the relayer's gateway is the only recipient of the cargo.
+    //     // Any other target gateway is ignored.
+    //     console.warn("[CRN] Ignoring parcel collection request because it isn't for our relayer");
+    //     return;
+    // }
 
     const parcelFileNames = fs.readdirSync(CRN_PARCELS_DIR_PATH).map(f => path.join(CRN_PARCELS_DIR_PATH, f));
 
@@ -124,7 +148,10 @@ async function* fetchCargoesPayloads(gatewayAddresses) {
         // Use fs.createReadStream() in production.
         parcels[parcelFileName] = fs.readFileSync(parcelFileName);
     }
-    yield {gatewayAddress: RELAYER_GW_ADDRESS, parcels};
+    yield {
+        gatewayCertPath: RELAYER_GW_CERT_PATH, // Again, we MUSTN'T do this, but the PoC doesn't support CCAs
+        parcels
+    };
 }
 
 function ackCrnParcelCollection(parcelId) {
