@@ -85,16 +85,16 @@ At this point you're ready to see Relaynet in action. You can do the following, 
    ```bash
    bin/relay \
        --cosocket=/tmp/user-gateway-data/cosocket.sock \
-       --input=/tmp/usb-flashdrive/user-gw \
-       --output=/tmp/usb-flashdrive/relayer-gw
+       --incoming=/tmp/usb-flashdrive/user-gw \
+       --outgoing=/tmp/usb-flashdrive/relayer-gw
    ```
 1. Run `bin/relay` again, but this time to simulate the exchange of cargo between the relayer and their gateway. Make sure to set `--cosocket` to the relayer's gateway's socket path (output when you ran `bin/relayer-gateway`). For example:
 
    ```bash
    bin/relay \
        --cosocket=/tmp/relayer-gateway-data/cosocket.sock \
-       --input=/tmp/usb-flashdrive/relayer-gw \
-       --output=/tmp/usb-flashdrive/user-gw
+       --incoming=/tmp/usb-flashdrive/relayer-gw \
+       --outgoing=/tmp/usb-flashdrive/user-gw
    ```
 1. Go to twitter.com and check your account. You should find your tweet there.
 

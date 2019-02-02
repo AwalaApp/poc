@@ -9,12 +9,12 @@ const uuid4 = require('uuid4');
 const yargs = require('yargs');
 
 async function main(argv) {
-    fs.mkdirSync(argv.input, {recursive: true});
-    fs.mkdirSync(argv.output, {recursive: true});
+    fs.mkdirSync(argv.incoming, {recursive: true});
+    fs.mkdirSync(argv.outgoing, {recursive: true});
 
     const client = new CoSocketClient(argv.cosocket);
 
-    const outgoingCargoes = generateOutgoingCargoes(argv.input);
+    const outgoingCargoes = generateOutgoingCargoes(argv.incoming);
     const deliveredCargoPaths = await client.deliverCargoes(outgoingCargoes);
     for (const deliveredCargoPath of deliveredCargoPaths) {
         console.log(`Cargo ${deliveredCargoPath} was delivered, so it will now be removed.`);
@@ -27,7 +27,7 @@ async function main(argv) {
 
     const collectedCargoes = await client.collectCargoes();
     for (const cargoReadable of collectedCargoes) {
-        const cargoFilePath = path.join(argv.output, `${uuid4()}.cargo`);
+        const cargoFilePath = path.join(argv.outgoing, `${uuid4()}.cargo`);
         console.log(`Saving collected cargo in ${cargoFilePath}`);
         const cargoFile = fs.createWriteStream(cargoFilePath);
         cargoReadable.pipe(cargoFile);
@@ -35,7 +35,7 @@ async function main(argv) {
 }
 
 function* generateOutgoingCargoes(outgoingCargoDirPath) {
-    const outgoingCargoPaths = fs.readdirSync(outgoingCargoDirPath).map(f => path.join(argv.input, f));
+    const outgoingCargoPaths = fs.readdirSync(outgoingCargoDirPath).map(f => path.join(argv.incoming, f));
     for (const cargoPath of outgoingCargoPaths) {
         // We should use fs.createReadStream() in production to avoid loading the entire cargo in memory.
         // That'd require yielding the cargo size as well.
@@ -55,13 +55,13 @@ const argv = yargs
         description: "Path to the gateway's CoSocket socket",
         normalize: true,
     })
-    .option('input', {
+    .option('incoming', {
         demandOption: true,
         requiresArg: true,
         description: "Path to the directory containing the cargo(es) to deliver to the gateway",
         normalize: true,
     })
-    .option('output', {
+    .option('outgoing', {
         demandOption: true,
         requiresArg: true,
         description: "Path to the directory where the cargo(es) collected from the gateway should be stored",
