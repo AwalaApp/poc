@@ -10,6 +10,8 @@ This a [Level 3 integration](https://github.com/relaynet/specs/blob/master/rs012
 
 The Twitter app in this PoC isn't really a mobile app: It's a CLI.
 
+Note that this PoC is not kept in sync with the latest changes to the [Relaynet Protocol Suite Specifications](https://github.com/relaynet/specs).
+
 ## Network diagram
 
 The following network diagram illustrates the overall system:
