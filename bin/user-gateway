@@ -24,46 +24,46 @@ const COSOCKET_SOCKET_PATH = path.join(DATA_DIR_PATH, 'cosocket.sock');
 
 const POGRPC_NETLOC = '127.0.0.1:1473'; // 1473? Too late!
 
-const PDN_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'pdn-parcels');
-const CRN_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'crn-parcels');
+const PDC_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'pdc-parcels');
+const CRC_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'crc-parcels');
 
 const RELAYER_GW_CERT_PATH = path.normalize(__dirname + '/../certs/relayer-gateway.cert.pem');
 const RELAYER_GW_ADDRESS = getAddressFromCert(fs.readFileSync(RELAYER_GW_CERT_PATH));
 
 function main() {
     fs.mkdirSync(DATA_DIR_PATH, {recursive: true});
-    fs.mkdirSync(PDN_PARCELS_DIR_PATH, {recursive: true});
-    fs.mkdirSync(CRN_PARCELS_DIR_PATH, {recursive: true});
+    fs.mkdirSync(PDC_PARCELS_DIR_PATH, {recursive: true});
+    fs.mkdirSync(CRC_PARCELS_DIR_PATH, {recursive: true});
 
     const parcelNotifier = new EventEmitter();
-    parcelNotifier.on('pdn', deliverPndParcel);
-    parcelNotifier.on('pdnCollection', ackPdnParcelCollection);
-    parcelNotifier.on('crn', deliverCrnParcel);
-    parcelNotifier.on('crnCollection', ackCrnParcelCollection);
+    parcelNotifier.on('pdc', deliverPndParcel);
+    parcelNotifier.on('pdcCollection', ackPdcParcelCollection);
+    parcelNotifier.on('crc', deliverCrcParcel);
+    parcelNotifier.on('crcCollection', ackCrcParcelCollection);
 
     cosocketServer(COSOCKET_SOCKET_PATH, CERT_PATH, KEY_PATH, parcelNotifier, fetchCargoesPayloads);
-    pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier, collectPdnParcels);
+    pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier, collectPdcParcels);
 
     console.log(`Running user's gateway ${ADDRESS}
 
-CRN:
+CRC:
  * Binding: CoSocket (${COSOCKET_SOCKET_PATH})
  * Relayer gateway address: ${RELAYER_GW_ADDRESS}
 
-PDN:
+PDC:
  * Binding: PogRPC (${POGRPC_NETLOC})
 `);
 }
 
 /**
- * Deliver parcel (received through CRN) to its corresponding public endpoint.
+ * Deliver parcel (received through CRC) to its corresponding public endpoint.
  *
  * This function is called for each parcel contained in a cargo relayed to the this gateway.
  *
  * @param parcelSerialized
  * @returns {Promise<void>}
  */
-async function deliverCrnParcel(parcelSerialized) {
+async function deliverCrcParcel(parcelSerialized) {
     const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
 
     const hash = createHash('sha256');
@@ -71,9 +71,9 @@ async function deliverCrnParcel(parcelSerialized) {
     hash.update(parcel.id);
     const internalParcelId = hash.digest('hex');
 
-    const parcelPath = path.join(PDN_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
+    const parcelPath = path.join(PDC_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
     fs.writeFileSync(parcelPath, parcelSerialized);
-    console.log(`[CRN] Added parcel ${parcel.id} to PDN queue.`);
+    console.log(`[CRC] Added parcel ${parcel.id} to PDC queue.`);
 }
 
 async function deliverPndParcel(parcelSerialized) {
@@ -84,12 +84,12 @@ async function deliverPndParcel(parcelSerialized) {
     hash.update(parcel.id);
     const internalParcelId = hash.digest('hex');
 
-    const parcelPath = path.join(CRN_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
+    const parcelPath = path.join(CRC_PARCELS_DIR_PATH, `${internalParcelId}.parcel`);
     fs.writeFileSync(parcelPath, parcelSerialized);
-    console.log(`[PDN] Added parcel ${parcel.id} to CRN queue.`);
+    console.log(`[PDC] Added parcel ${parcel.id} to CRC queue.`);
 }
 
-function ackPdnParcelCollection(parcelId) {
+function ackPdcParcelCollection(parcelId) {
     // In this case, the parcelId is the path on disk, but it could be an S3 object URL
     // or a DB PK (if the parcel is stored in a DB), for example. This scenario is likely
     // with a relayer gateway.
@@ -97,13 +97,13 @@ function ackPdnParcelCollection(parcelId) {
     // We should check that the path actually corresponds to a collected parcel in
     // production.
 
-    console.log(`[PDN] Parcel ${parcelId} was collected and will be removed.`);
+    console.log(`[PDC] Parcel ${parcelId} was collected and will be removed.`);
     fs.unlinkSync(parcelId);
 }
 
-async function* collectPdnParcels() {
-    const parcelFileNames = fs.readdirSync(PDN_PARCELS_DIR_PATH)
-        .map(f => path.join(PDN_PARCELS_DIR_PATH, f));
+async function* collectPdcParcels() {
+    const parcelFileNames = fs.readdirSync(PDC_PARCELS_DIR_PATH)
+        .map(f => path.join(PDC_PARCELS_DIR_PATH, f));
 
     for (const parcelFileName of parcelFileNames) {
         // Use fs.createReadStream() in production.
@@ -118,7 +118,7 @@ async function* collectPdnParcels() {
  * fit in one cargo.
  *
  * The function is a generator and takes the target gateway addresses as input because the generic code
- * in the CRN server should be agnostic of the storage medium. This implementation uses the file system,
+ * in the CRC server should be agnostic of the storage medium. This implementation uses the file system,
  * but a relayer's gateway could use S3 or a DB to store the parcels, for example.
  *
  * @param {Array<string>} gatewayAddresses
@@ -129,11 +129,11 @@ async function* fetchCargoesPayloads(gatewayAddresses) {
     // if (!gatewayAddresses.includes(RELAYER_GW_ADDRESS)) {
     //     // Because this is the user's gateway, the relayer's gateway is the only recipient of the cargo.
     //     // Any other target gateway is ignored.
-    //     console.warn("[CRN] Ignoring parcel collection request because it isn't for our relayer");
+    //     console.warn("[CRC] Ignoring parcel collection request because it isn't for our relayer");
     //     return;
     // }
 
-    const parcelFileNames = fs.readdirSync(CRN_PARCELS_DIR_PATH).map(f => path.join(CRN_PARCELS_DIR_PATH, f));
+    const parcelFileNames = fs.readdirSync(CRC_PARCELS_DIR_PATH).map(f => path.join(CRC_PARCELS_DIR_PATH, f));
 
     if (parcelFileNames.length === 0) {
         return;
@@ -150,7 +150,7 @@ async function* fetchCargoesPayloads(gatewayAddresses) {
     };
 }
 
-function ackCrnParcelCollection(parcelId) {
+function ackCrcParcelCollection(parcelId) {
     // In this case, the parcelId is the path on disk, but it could be an S3 object URL
     // or a DB PK (if the parcel is stored in a DB), for example. This scenario is likely
     // with a relayer gateway.
@@ -158,7 +158,7 @@ function ackCrnParcelCollection(parcelId) {
     // We should check that the path actually corresponds to a collected parcel in
     // production.
 
-    console.log(`[CRN] Cargo containing parcel ${parcelId} was collected. The parcel will be removed.`);
+    console.log(`[CRC] Cargo containing parcel ${parcelId} was collected. The parcel will be removed.`);
     fs.unlinkSync(parcelId);
 }
 

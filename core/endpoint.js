@@ -12,15 +12,15 @@ class ClientEndpoint {
     /**
      * @param {string} certPath
      * @param {string} keyPath
-     * @param {PogRPCClient} pdnClient
+     * @param {PogRPCClient} pdcClient
      * @param {function(Message): Buffer} serializer
      * @param {function(Buffer): Message} deserializer
      */
-    constructor(certPath, keyPath, pdnClient, serializer, deserializer) {
+    constructor(certPath, keyPath, pdcClient, serializer, deserializer) {
         this.cert = fs.readFileSync(certPath);
         this.keyPath = keyPath;
 
-        this._pdnClient = pdnClient;
+        this._pdcClient = pdcClient;
 
         this._serializer = serializer;
         this._deserializer = deserializer;
@@ -49,14 +49,14 @@ class ClientEndpoint {
             date,
             ttl,
         );
-        await this._pdnClient.deliverParcels([{id, parcel: parcelSerialized}]);
+        await this._pdcClient.deliverParcels([{id, parcel: parcelSerialized}]);
     }
 
     /**
      * @returns {AsyncIterableIterator<Message>}
      */
     async* collectMessages() {
-        const parcelSerializations = await this._pdnClient.collectParcels();
+        const parcelSerializations = await this._pdcClient.collectParcels();
         for (const parcelSerialized of parcelSerializations) {
             const parcel = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
 

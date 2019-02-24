@@ -75,8 +75,8 @@ async function collectCargoes(client, keyPath, parcelNotifier) {
             const cargoPayloadDecrypted = await cargo.decryptPayload(keyPath);
             const parcelSerializations = deserializeCargoPayload(cargoPayloadDecrypted);
             for (const parcelSerialized of parcelSerializations) {
-                // Notify about receipt of parcel from Cargo Relay Network (CRN)
-                parcelNotifier.emit('crn', parcelSerialized);
+                // Notify receipt of parcel from Cargo Relay Connection (CRC)
+                parcelNotifier.emit('crc', parcelSerialized);
             }
 
             if (!client.destroyed) {
@@ -98,7 +98,7 @@ async function deliverCargoes(client, cargoPayloadFetcher, certPath, keyPath, pa
     stream.on('data', function (data) {
         const cargoId = data.toString();
         const parcelIds = collectedParcelsByCargoId[cargoId] || [];
-        parcelIds.map(id => parcelNotifier.emit('crnCollection', id));
+        parcelIds.map(id => parcelNotifier.emit('crcCollection', id));
     });
     stream.init();
 

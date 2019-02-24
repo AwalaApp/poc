@@ -59,7 +59,7 @@ class APIAdapterEndpoint {
             // This PoC doesn't use ALPN for expediency and it only supports PogRPC.
         }
 
-        const pdnClient = new PogRPCClient(
+        const pdcClient = new PogRPCClient(
             address,
             null,
             false, // TLS must be enforced in production
@@ -79,7 +79,7 @@ class APIAdapterEndpoint {
         const currentEndpoint = new Endpoint(
             currentEndpointCertPath,
             this._keyPath,
-            pdnClient,
+            pdcClient,
             serializeMessage,
             deserializeMessage,
         );

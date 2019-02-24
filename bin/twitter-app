@@ -24,8 +24,8 @@ const ENDPOINT_ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
 const APP_FIRST_RUN_FILE_PATH = path.join(os.tmpdir(), 'twitter-app-first-run');
 
 async function main() {
-    const pdnClient = new PogRPCClient(GATEWAY_ADDRESS, ENDPOINT_ADDRESS, false); // MUST only use TLS in production
-    const endpoint = new Endpoint(CERT_PATH, KEY_PATH, pdnClient, serializeMessage, deserializeMessage);
+    const pdcClient = new PogRPCClient(GATEWAY_ADDRESS, ENDPOINT_ADDRESS, false); // MUST only use TLS in production
+    const endpoint = new Endpoint(CERT_PATH, KEY_PATH, pdcClient, serializeMessage, deserializeMessage);
     const twitterClient = new TwitterClient(
         process.env.TWITTER_ACCESS_TOKEN_KEY,
         process.env.TWITTER_ACCESS_TOKEN_SECRET,

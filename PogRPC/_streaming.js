@@ -26,7 +26,7 @@ function deliverParcels(parcelsSerialized, grpcCall, parcelNotifier = null) {
             }
 
             if (parcelNotifier) {
-                parcelNotifier.emit('pdnCollection', parcelId);
+                parcelNotifier.emit('pdcCollection', parcelId);
             }
             delete parcelByPendingDeliveryIds[deliveryAck.id];
 

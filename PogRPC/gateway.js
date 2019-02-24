@@ -13,7 +13,7 @@ const pogrpcPackage = grpc.loadPackageDefinition(packageDefinition).relaynet.pog
 
 function collectParcels(call, parcelNotifier) {
     call.on('data', function (parcelDelivery) {
-        parcelNotifier.emit('pdn', parcelDelivery.parcel);
+        parcelNotifier.emit('pdc', parcelDelivery.parcel);
         call.write({id: parcelDelivery.id}); // ACK
     });
 
