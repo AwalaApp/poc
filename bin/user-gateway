@@ -56,13 +56,9 @@ PDN:
 }
 
 /**
- * Deliver parcel (received through CRN) to its corresponding _host_ endpoint.
+ * Deliver parcel (received through CRN) to its corresponding public endpoint.
  *
  * This function is called for each parcel contained in a cargo relayed to the this gateway.
- *
- * CRN = Cargo Relay Network (the network established by a gateway and its relayers). Also, "host endpoint"
- * is an endpoint listening on a network address (using a parcel delivery binding like PogRPC), as opposed
- * to a private endpoint (which has an opaque address).
  *
  * @param parcelSerialized
  * @returns {Promise<void>}

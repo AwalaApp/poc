@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate certificates for a host endpoint or gateway
+# Generate certificates for a public endpoint or gateway
 
 set -o nounset
 set -o errexit

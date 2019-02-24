@@ -1,7 +1,7 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-// Binding-agnostic endpoint for applications acting as clients (as opposed to hosts).
+// Binding-agnostic endpoint for applications acting as clients (as opposed to servers).
 
 const fs = require('fs');
 const {getAddressFromCert} = require('./pki');

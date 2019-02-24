@@ -6,7 +6,7 @@ const Endpoint = require('../core/endpoint');
 const EventEmitter = require('events');
 const fs = require('fs');
 const PogRPCClient = require('../PogRPC/client');
-const pogrpcEndpoint = require('../PogRPC/host_endpoint');
+const pogrpcEndpoint = require('../PogRPC/public_endpoint');
 const tmp = require('tmp-promise');
 const Twitter = require('twitter-lite');
 const {derCertToPem} = require('../core/_asn1_utils');
@@ -35,16 +35,20 @@ class APIAdapterEndpoint {
      * @param {Message} message
      * @param {Buffer} targetEndpointCert
      * @param {string} relayEndpoint
-     * @param {null|Buffer} parcelDeliveryAuthCert
+     * @param {null|Buffer} parcelDeliveryAuth
      * @returns {Promise<void>}
      */
-    async deliverMessage(message, targetEndpointCert, relayEndpoint, parcelDeliveryAuthCert = null) {
-        const {scheme, address} = relayEndpoint.match(/^(?<scheme>[\w+]+):(?<address>.+)$/).groups;
-        if (scheme !== 'rneh' && !scheme.startsWith('rneh+')) {
-            console.error(`Host endpoints can only deliver parcels to a relaying gateway's PDN host endpoint, so we can't deliver messages to ${relayEndpoint}.`);
+    async deliverMessage(message, targetEndpointCert, relayEndpoint, parcelDeliveryAuth = null) {
+        const recipientMatch = relayEndpoint.match(/^rne(\+(?<binding>[\w]+))?:\/\/(?<address>.+)$/);
+
+        if (!recipientMatch) {
+            console.error(`Invalid public address for relaying gateway: ${recipient}.`);
             return;
         }
-        if (scheme.startsWith('rneh+') && scheme !== 'rneh+grpc') {
+
+        const {binding, address} = recipientMatch.groups;
+
+        if (binding && binding !== 'grpc') {
             // The address includes the binding hint, but PogRPC is the only supported binding
             // in this PoC.
             console.error(`This PoC can only deliver parcels via PogRPC, so we can't deliver messages to ${relayEndpoint}.`);
@@ -63,13 +67,13 @@ class APIAdapterEndpoint {
 
         const targetEndpointCertPem = derCertToPem(targetEndpointCert);
         const targetEndpointAddress = getAddressFromCert(targetEndpointCertPem);
-        if (targetEndpointAddress.startsWith('rneo:') && !parcelDeliveryAuthCert) {
-            throw new Error('Private endpoints are unreachable without Parcel Delivery Authorization Certificates');
+        if (!targetEndpointAddress.match(/^rne(\+[\w]+)?:\/\//) && !parcelDeliveryAuth) {
+            throw new Error('Private endpoints are unreachable without Parcel Delivery Authorizations');
         }
 
         let currentEndpointCertPath = this._certPath;
-        if (parcelDeliveryAuthCert) {
-            currentEndpointCertPath = await bufferToTmpFile(parcelDeliveryAuthCert);
+        if (parcelDeliveryAuth) {
+            currentEndpointCertPath = await bufferToTmpFile(parcelDeliveryAuth);
         }
 
         const currentEndpoint = new Endpoint(
@@ -137,7 +141,7 @@ function runServer(netloc, serverCert, serverKey, endpointCertPath, endpointKeyP
         }
     }
 
-    pogrpcEndpoint.runHost(netloc, serverCert, serverKey, endpointKeyPath, deserializeMessage, routeMessage);
+    pogrpcEndpoint.runServer(netloc, serverCert, serverKey, endpointKeyPath, deserializeMessage, routeMessage);
 }
 
 async function bufferToTmpFile(buffer) {

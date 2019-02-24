@@ -26,7 +26,7 @@ const CERT_PATH = path.join(CERTS_DIR_PATH, 'relayer-gateway.cert.pem');
 const KEY_PATH = path.join(CERTS_DIR_PATH, 'relayer-gateway.key.pem');
 
 const GATEWAY_CRN_ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
-const GATEWAY_PDN_ADDRESS = `rneh+grpc:${POGRPC_NETLOC}`;
+const GATEWAY_PDN_ADDRESS = `rne+grpc://${POGRPC_NETLOC}`;
 
 // This is *WRONG*. The the relaying gateway MUST take the target gateway's certificate from the
 // Cargo Collection Authorization (CCA), which MUST be attached to the request to collect cargo.
@@ -59,17 +59,13 @@ PogRPC listening on ${POGRPC_NETLOC}
 }
 
 /**
- * Deliver parcel (received through CRN) to its corresponding _host_ endpoint.
+ * Deliver parcel (received through CRN) to its corresponding public endpoint.
  *
  * This function is called for each parcel contained in a cargo relayed to the this gateway.
  *
- * CRN = Cargo Relay Network (the network established by a gateway and its relayers). Also, "host endpoint"
- * is an endpoint listening on a network address (using a parcel delivery binding like PogRPC), as opposed
- * to a private endpoint (which has an opaque address).
- *
  * The production-ready equivalent of this function would be different in multiple ways. For example:
  *
- * - It should support multiple parcel delivery bindings, not just PogRPC.
+ * - It could support multiple parcel delivery bindings, not just PogRPC.
  * - Whatever the binding, it should _queue_ the delivery, not do it in band.
  * - It should support parcels sent to private endpoints (those with opaque
  *   addresses). Whilst unlikely, it'd be necessary if/when the relayer exposes
@@ -80,16 +76,17 @@ PogRPC listening on ${POGRPC_NETLOC}
  */
 async function deliverCrnParcel(parcelSerialized) {
     const {id, recipient} = await PARCEL_SERIALIZER.deserialize(parcelSerialized);
-    const {scheme, address} = recipient.match(/^(?<scheme>[\w+]+):(?<address>.+)$/).groups;
+    const recipientMatch = recipient.match(/^rne(\+(?<binding>[\w]+))?:\/\/(?<address>.+)$/);
 
-    if (scheme !== 'rneh' && !scheme.startsWith('rneh+')) {
-        console.error(`This relayer gateway can only deliver parcels to host endpoints. Parcel ${id} for ${recipient} will be ignored.`);
+    if (!recipientMatch) {
+        console.error(`Invalid public endpoint address: ${recipient}.`);
         return;
     }
 
-    if (scheme.startsWith('rneh+') && scheme !== 'rneh+grpc') {
-        // The address includes the binding hint, but PogRPC is the only supported binding
-        // in this PoC.
+    const {binding, address} = recipientMatch.groups;
+
+    if (binding && binding !== 'grpc') {
+        // The address includes the binding hint, but PogRPC is the only supported binding in this PoC.
         console.error(`This PoC can only deliver parcels via PogRPC. Parcel ${id}  will be ignored.`);
         return;
 

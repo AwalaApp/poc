@@ -1,7 +1,7 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-// PogRPC host endpoint.
+// PogRPC public endpoint.
 
 const grpc = require('grpc');
 const grpcProtoLoader = require('@grpc/proto-loader');
@@ -14,7 +14,7 @@ const pogrpcPackageDefinition = grpcProtoLoader.loadSync(
 const pogrpcPackage = grpc.loadPackageDefinition(pogrpcPackageDefinition).relaynet.pogrpc;
 
 /**
- * Start a _host endpoint_.
+ * Start a public endpoint server.
  *
  * @param {string} netloc
  * @param {Buffer} serverCert PEM-encoded X.509 cert for the HTTP server
@@ -23,7 +23,7 @@ const pogrpcPackage = grpc.loadPackageDefinition(pogrpcPackageDefinition).relayn
  * @param {function(Buffer): Message} messageDeserializer
  * @param {function(Message, Buffer, string)} messageProcessor Function to call with the message extracted from a parcel
  */
-function runHost(netloc, serverCert, serverKey, endpointKeyPath, messageDeserializer, messageProcessor) {
+function runServer(netloc, serverCert, serverKey, endpointKeyPath, messageDeserializer, messageProcessor) {
     const server = new grpc.Server();
     server.addService(pogrpcPackage.PogRPC.service, {
         deliverParcels(call) {
@@ -54,5 +54,5 @@ function runHost(netloc, serverCert, serverKey, endpointKeyPath, messageDeserial
 }
 
 module.exports = {
-    runHost,
+    runServer,
 };
