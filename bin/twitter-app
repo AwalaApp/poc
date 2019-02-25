@@ -5,11 +5,10 @@
 const Endpoint = require('../core/endpoint');
 const fs = require('fs');
 const path = require('path');
-const PogRPCClient = require('../PogRPC/client');
+const PoWebSocketClient = require('../PoWebSocket/client');
 const os = require('os');
 const readline = require('readline');
 const TwitterClient = require('../twitter-service/client');
-const {getAddressFromCert} = require('../core/pki');
 const {Tweet, deserializeMessage, serializeMessage} = require('../twitter-service/service_messages');
 
 require('dotenv').config();
@@ -18,13 +17,12 @@ const CERTS_DIR_PATH = path.join(path.dirname(__dirname), 'certs');
 const CERT_PATH = path.join(CERTS_DIR_PATH, 'twitter-app.cert.pem');
 const KEY_PATH = path.join(CERTS_DIR_PATH, 'twitter-app.key.pem');
 
-const GATEWAY_ADDRESS = '127.0.0.1:1473';
-const ENDPOINT_ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
+const POWEBSOCKET_SOCKET_PATH = path.join(os.tmpdir(), 'user-gateway-data', 'powebsocket.sock');
 
 const APP_FIRST_RUN_FILE_PATH = path.join(os.tmpdir(), 'twitter-app-first-run');
 
 async function main() {
-    const pdcClient = new PogRPCClient(GATEWAY_ADDRESS, ENDPOINT_ADDRESS, false); // MUST only use TLS in production
+    const pdcClient = new PoWebSocketClient(`ws+unix://${POWEBSOCKET_SOCKET_PATH}`);
     const endpoint = new Endpoint(CERT_PATH, KEY_PATH, pdcClient, serializeMessage, deserializeMessage);
     const twitterClient = new TwitterClient(
         process.env.TWITTER_ACCESS_TOKEN_KEY,
@@ -49,6 +47,8 @@ async function main() {
         await twitterClient.postTweet(tweet);
         console.log('✔️ Tweet added to queue.')
     }
+
+    endpoint.close();
 }
 
 function promptTweetStatus() {

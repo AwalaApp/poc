@@ -101,7 +101,7 @@ async function deliverCrcParcel(parcelSerialized) {
         TWITTER_API_ENDPOINT_SERVER_CERT, // Don't do in production
     );
     try {
-        await pdcClient.deliverParcels([{id, parcel: parcelSerialized}]);
+        await pdcClient.deliverParcels([parcelSerialized]);
     } catch (error) {
         // We should retry in production, depending on the type of error.
         console.error(`Could not deliver parcel ${id} to ${recipient}:`, error.toString());

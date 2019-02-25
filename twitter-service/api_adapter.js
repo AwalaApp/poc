@@ -87,6 +87,8 @@ class APIAdapterEndpoint {
         const targetEndpointCertPath = await bufferToTmpFile(targetEndpointCertPem);
         // Note: It's the endpoint's responsibility to retry if the parcel couldn't be delivered.
         await currentEndpoint.deliverMessage(message, targetEndpointCertPath);
+
+        currentEndpoint.close();
     }
 }
 

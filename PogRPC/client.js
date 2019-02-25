@@ -5,7 +5,7 @@
 
 const grpc = require('grpc');
 const grpcProtoLoader = require('@grpc/proto-loader');
-const {deliverParcels} = require('./_streaming');
+const uuid4 = require('uuid4');
 
 const pogrpcPackageDefinition = grpcProtoLoader.loadSync(
     __dirname + '/pogrpc.proto',
@@ -31,8 +31,12 @@ class PogRPCClient {
         }
     }
 
+    close() {
+        this._grpcClient.close();
+    }
+
     /**
-     * @param {Array<Object<{id: string, parcel: Buffer}>>} parcelsSerialized
+     * @param {Array<Buffer>} parcelsSerialized
      * @returns {Promise<void>}
      */
     async deliverParcels(parcelsSerialized) {
@@ -73,6 +77,54 @@ class PogRPCClient {
             });
         });
     }
+}
+
+/**
+ * @param {Array<Buffer>} parcelsSerialized
+ * @param {ClientDuplexStream} grpcCall
+ * @returns {Promise<void>}
+ */
+function deliverParcels(parcelsSerialized, grpcCall) {
+    // The final implementation should actually work with streams instead of loading everything in
+    // memory and doing so much stuff synchronously.
+
+    const pendingDeliveryIds = new Set();
+    let allParcelsSent = false;
+
+    return new Promise((resolve, reject) => {
+        grpcCall.on('data', function (deliveryAck) {
+            if (!pendingDeliveryIds.has(deliveryAck.id)) {
+                grpcCall.end();
+                reject(new Error(`Got ACK for unknown parcel (${deliveryAck.id})`));
+                return;
+            }
+
+            pendingDeliveryIds.delete(deliveryAck.id);
+
+            if (allParcelsSent && pendingDeliveryIds.size === 0) {
+                grpcCall.end();
+                resolve();
+            }
+        });
+
+        grpcCall.on('error', reject);
+
+        grpcCall.on('end', function () {
+            grpcCall.end();
+        });
+
+        for (const parcel of parcelsSerialized) {
+            const parcelDeliveryId = uuid4();
+            grpcCall.write({id: parcelDeliveryId, parcel});
+            pendingDeliveryIds.add(parcelDeliveryId);
+        }
+        allParcelsSent = true;
+
+        if (pendingDeliveryIds.size === 0) {
+            grpcCall.end();
+            resolve();
+        }
+    });
 }
 
 module.exports = PogRPCClient;

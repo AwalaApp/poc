@@ -49,7 +49,7 @@ class ClientEndpoint {
             date,
             ttl,
         );
-        await this._pdcClient.deliverParcels([{id, parcel: parcelSerialized}]);
+        await this._pdcClient.deliverParcels([parcelSerialized]);
     }
 
     /**
@@ -71,6 +71,10 @@ class ClientEndpoint {
             const message = this._deserializer(payload);
             yield message;
         }
+    }
+
+    close() {
+        this._pdcClient.close();
     }
 }
 

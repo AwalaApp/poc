@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package relaynet.powebsocket;
+
+message ParcelDelivery {
+    string id = 1;
+    bytes parcel = 2;
+}
+
+message ParcelDeliveryAck {
+    string id = 1;
+}
+
+message ParcelCollectionRequest {
+}
+
+message ParcelDeliveryComplete {
+}
+
+message Quit {
+}

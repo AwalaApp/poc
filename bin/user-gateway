@@ -7,7 +7,7 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const pogrpcGateway = require('../PogRPC/gateway');
+const powebsocketGateway = require('../PoWebSocket/gateway');
 const {createHash} = require('crypto');
 const {getAddressFromCert} = require('../core/pki');
 const {PARCEL_SERIALIZER} = require('../core/serialization');
@@ -20,9 +20,8 @@ const KEY_PATH = path.normalize(__dirname + '/../certs/user-gateway.key.pem');
 const ADDRESS = getAddressFromCert(fs.readFileSync(CERT_PATH));
 
 const DATA_DIR_PATH = path.join(os.tmpdir(), 'user-gateway-data');
+const POWEBSOCKET_SOCKET_PATH = path.join(DATA_DIR_PATH, 'powebsocket.sock');
 const COSOCKET_SOCKET_PATH = path.join(DATA_DIR_PATH, 'cosocket.sock');
-
-const POGRPC_NETLOC = '127.0.0.1:1473'; // 1473? Too late!
 
 const PDC_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'pdc-parcels');
 const CRC_PARCELS_DIR_PATH = path.join(DATA_DIR_PATH, 'crc-parcels');
@@ -42,7 +41,11 @@ function main() {
     parcelNotifier.on('crcCollection', ackCrcParcelCollection);
 
     cosocketServer(COSOCKET_SOCKET_PATH, CERT_PATH, KEY_PATH, parcelNotifier, fetchCargoesPayloads);
-    pogrpcGateway.runServer(POGRPC_NETLOC, parcelNotifier, collectPdcParcels);
+    powebsocketGateway.runUnixSocketServer(
+        POWEBSOCKET_SOCKET_PATH,
+        parcelNotifier,
+        collectPdcParcels,
+    );
 
     console.log(`Running user's gateway ${ADDRESS}
 
@@ -51,7 +54,7 @@ CRC:
  * Relayer gateway address: ${RELAYER_GW_ADDRESS}
 
 PDC:
- * Binding: PogRPC (${POGRPC_NETLOC})
+ * Binding: PoWebSocket (${POWEBSOCKET_SOCKET_PATH})
 `);
 }
 
