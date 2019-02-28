@@ -5,13 +5,16 @@
 
 const assert = require('assert').strict;
 const {certificateFromPem} = require('node-forge').pki;
+const {derCertToPem, isPemCert} = require('../_asn1_utils');
 
 /**
- * @param {Buffer} certPem
+ * @param {Buffer} certSerialized
  * @returns {string}
  */
-function getAddressFromCert(certPem) {
-    const cert = certificateFromPem(certPem);
+function getAddressFromCert(certSerialized) {
+    // The production equivalent of this function MUST validate the address.
+    const pemCert = isPemCert(certSerialized) ? certSerialized : derCertToPem(certSerialized);
+    const cert = certificateFromPem(pemCert);
     const extension = cert.getExtension('subjectAltName');
     assert.equal(extension.altNames.length, 1, 'There must be exactly one alt name');
     const altName = extension.altNames[0];

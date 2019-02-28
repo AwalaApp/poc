@@ -22,7 +22,11 @@ const POWEBSOCKET_SOCKET_PATH = path.join(os.tmpdir(), 'user-gateway-data', 'pow
 const APP_FIRST_RUN_FILE_PATH = path.join(os.tmpdir(), 'twitter-app-first-run');
 
 async function main() {
-    const pdcClient = new PoWebSocketClient(`ws+unix://${POWEBSOCKET_SOCKET_PATH}`);
+    const pdcClient = new PoWebSocketClient(
+        `ws+unix://${POWEBSOCKET_SOCKET_PATH}`,
+        fs.readFileSync(CERT_PATH),
+        fs.readFileSync(KEY_PATH),
+    );
     const endpoint = new Endpoint(CERT_PATH, KEY_PATH, pdcClient, serializeMessage, deserializeMessage);
     const twitterClient = new TwitterClient(
         process.env.TWITTER_ACCESS_TOKEN_KEY,
@@ -31,7 +35,8 @@ async function main() {
     );
 
     if (fs.existsSync(APP_FIRST_RUN_FILE_PATH)) {
-        console.log(`You were subscribed to updates to your timeline. Remove ${APP_FIRST_RUN_FILE_PATH} to resubscribe.`);
+        console.log('You were previously subscribed to updates to your timeline.');
+        console.log(`Remove ${APP_FIRST_RUN_FILE_PATH} to resubscribe.`);
     } else {
         await twitterClient.subscribeToUpdates();
         fs.writeFileSync(APP_FIRST_RUN_FILE_PATH, '');

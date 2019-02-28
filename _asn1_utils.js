@@ -25,7 +25,12 @@ function derCertToPem(derBuffer) {
     return Buffer.from(pemString);
 }
 
+function isPemCert(certBuffer) {
+    return certBuffer.slice(0, 27).toString() === '-----BEGIN CERTIFICATE-----';
+}
+
 module.exports = {
-    pemCertToDer,
     derCertToPem,
+    isPemCert,
+    pemCertToDer,
 };

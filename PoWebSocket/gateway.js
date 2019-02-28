@@ -6,6 +6,7 @@ const http = require('http');
 const messages = require('./_messages');
 const uuid4 = require('uuid4');
 const ws = require('ws');
+const {runServerHandshake} = require('./_handshake');
 
 function configureConnection(connection, parcelNotifier, parcelCollector) {
     // TODO: Listen for new parcels in parcelNotifier
@@ -61,8 +62,23 @@ function runUnixSocketServer(socketPath, parcelNotifier, parcelCollector) {
     httpServer.listen(socketPath, function () {
         const wsServer = new ws.Server({server: httpServer});
 
-        wsServer.on('connection', function (connection) {
-            configureConnection(connection, parcelNotifier, parcelCollector)
+        wsServer.on('connection', (connection) => {
+            connection.on('error', (error) => {
+                console.error(error);
+            });
+
+            connection.on('close', (code, reason) => {
+                if (code === 1000) {
+                    return;
+                }
+                console.warn(`Connection wasn't closed cleanly (code ${code}, reason: ${reason})`);
+            });
+        });
+
+        wsServer.on('connection', (connection) => {
+            runServerHandshake(connection, () => {
+                configureConnection(connection, parcelNotifier, parcelCollector);
+            });
         });
     })
 }

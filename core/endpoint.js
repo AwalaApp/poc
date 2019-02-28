@@ -12,7 +12,7 @@ class ClientEndpoint {
     /**
      * @param {string} certPath
      * @param {string} keyPath
-     * @param {PogRPCClient} pdcClient
+     * @param {PogRPCClient|PoWebSocketClient} pdcClient
      * @param {function(Message): Buffer} serializer
      * @param {function(Buffer): Message} deserializer
      */

@@ -3,7 +3,9 @@
 
 const EventEmitter = require('events');
 const uuid4 = require('uuid4');
+const VError = require('verror');
 const WebSocket = require('ws');
+const {runClientHandshake} = require('./_handshake');
 const {
     deserializeMessage,
     ParcelCollectionRequest,
@@ -14,18 +16,45 @@ const {
 } = require('./_messages');
 
 class PoWebSocketClient extends EventEmitter {
-    constructor(wsServerAddress) {
+
+    /**
+     * @param wsUrl
+     * @param cert
+     * @param key
+     * @param {null|Array<Object<{cert: string, key: string}>>} oldCerts Certificates that
+     *        are still active are no longer used due to key rotation.
+     */
+    constructor(wsUrl, cert, key, oldCerts = null) {
         super();
 
-        this._client = new WebSocket(wsServerAddress);
-
+        this._wsUrl = wsUrl;
+        this._client = null;
         this._connected = false;
-        const self = this;
-        this._client.on('open', () => self._connected = true);
+
+        oldCerts = oldCerts || [];
+        this._certs = [{cert: cert, key: key}, ...oldCerts];
+    }
+
+    async _connect() {
+        if (this._connected) {
+            return;
+        }
+
+        this._client = new WebSocket(this._wsUrl);
+
+        try {
+            await runClientHandshake(this._client, this._certs);
+        } catch (error) {
+            this.close();
+            throw new VError(error, 'Could not do handshake with gateway');
+        }
+
+        this._connected = true;
+
     }
 
     close() {
-        this._client.close();
+        this._client.close(1000);
     }
 
     /**
@@ -41,6 +70,8 @@ class PoWebSocketClient extends EventEmitter {
 
         const self = this;
         return new Promise(async (resolve, reject) => {
+            await self._connect();
+
             function listenForAcks(messageSerialized) {
                 const message = deserializeMessage(messageSerialized);
                 if (message.$type !== ParcelDeliveryAck) {
@@ -89,6 +120,8 @@ class PoWebSocketClient extends EventEmitter {
         const self = this;
 
         return new Promise(async function (resolve, reject) {
+            await self._connect();
+
             async function collectParcel(messageSerialized) {
                 const message = deserializeMessage(messageSerialized);
                 switch (message.$type) {
@@ -110,23 +143,10 @@ class PoWebSocketClient extends EventEmitter {
 
             self._client.on('message', collectParcel);
 
-            await self._waitUntilConnected();
-
             try {
                 await self._sendMessage(ParcelCollectionRequest.create());
             } catch (error) {
                 reject(error);
-            }
-        });
-    }
-
-    _waitUntilConnected() {
-        const self = this;
-        return new Promise((resolve) => {
-            this._client.on('open', resolve);
-
-            if (self._connected) {
-                resolve();
             }
         });
     }
@@ -146,7 +166,7 @@ class PoWebSocketClient extends EventEmitter {
             }
 
             resolve();
-        })
+        });
     }
 }
 

@@ -1,7 +1,7 @@
 'use strict';
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-const {decrypt} = require('./_cms');
+const {decrypt} = require('../_cms');
 
 /**
  * Relaynet Abstract Message Format v1

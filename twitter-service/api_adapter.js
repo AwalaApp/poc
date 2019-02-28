@@ -9,7 +9,7 @@ const PogRPCClient = require('../PogRPC/client');
 const pogrpcEndpoint = require('../PogRPC/public_endpoint');
 const tmp = require('tmp-promise');
 const Twitter = require('twitter-lite');
-const {derCertToPem} = require('../core/_asn1_utils');
+const {derCertToPem} = require('../_asn1_utils');
 const {getAddressFromCert} = require('../core/pki');
 const {deserializeMessage, serializeMessage} = require('./service_messages');
 

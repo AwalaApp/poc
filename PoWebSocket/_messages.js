@@ -11,14 +11,12 @@ const ParcelDelivery = root.lookupType('relaynet.powebsocket.ParcelDelivery');
 const ParcelDeliveryAck = root.lookupType('relaynet.powebsocket.ParcelDeliveryAck');
 const ParcelCollectionRequest = root.lookupType('relaynet.powebsocket.ParcelCollectionRequest');
 const ParcelDeliveryComplete = root.lookupType('relaynet.powebsocket.ParcelDeliveryComplete');
-const Quit = root.lookupType('relaynet.powebsocket.Quit');
 
 const TYPE_BY_TAG = {
     0: ParcelDelivery,
     1: ParcelDeliveryAck,
     2: ParcelCollectionRequest,
     3: ParcelDeliveryComplete,
-    7: Quit,
 };
 const TAG_BY_TYPE = _.invert(TYPE_BY_TAG);
 
@@ -47,7 +45,7 @@ function deserializeMessage(messageSerialized) {
     const payload = type.decode(payloadSerialized);
     const verificationError = type.verify(payload);
     if (verificationError) {
-        assert.fail(verificationError);
+        throw verificationError;
     }
     return payload;
 }
@@ -59,5 +57,4 @@ module.exports = {
     ParcelDeliveryAck,
     ParcelCollectionRequest,
     ParcelDeliveryComplete,
-    Quit,
 };

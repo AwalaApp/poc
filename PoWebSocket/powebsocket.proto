@@ -16,6 +16,3 @@ message ParcelCollectionRequest {
 
 message ParcelDeliveryComplete {
 }
-
-message Quit {
-}

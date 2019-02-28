@@ -49,14 +49,15 @@ async function decrypt(ciphertext, keyPath) {
 
 /**
  * @param {Buffer} plaintext
- * @param {string} keyPath
+ * @param {string|Buffer} keyPem PEM-encoded private key (or the path to it)
  * @param {Buffer} certPem
  * @param {string} hashAlgorithm
  * @returns {Promise<Buffer>} The signature (detached)
  */
-async function sign(plaintext, keyPath, certPem, hashAlgorithm) {
+async function sign(plaintext, keyPem, certPem, hashAlgorithm) {
+    const keyPath = (typeof keyPem === 'string') ? keyPem : (await bufferToTmpFile(keyPem)).path;
     const certPemFile = await bufferToTmpFile(certPem);
-    return await opensslExec('cms.sign', plaintext, {
+    const result = await opensslExec('cms.sign', plaintext, {
         binary: true,
         outform: 'DER',
         md: hashAlgorithm,
@@ -64,6 +65,7 @@ async function sign(plaintext, keyPath, certPem, hashAlgorithm) {
         signer: certPemFile.path,
         inkey: keyPath,
     });
+    return result
 }
 
 /**

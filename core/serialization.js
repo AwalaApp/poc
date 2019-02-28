@@ -2,13 +2,13 @@
 // This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
 const BParser = require('binary-parser').Parser;
-const cms = require('./_cms');
+const cms = require('../_cms');
 const fs = require('fs');
 const uuid4 = require('uuid4');
 const VError = require('verror');
 const {Cargo, Parcel, ServiceMessage} = require('./messages');
 const {getAddressFromCert} = require('./pki');
-const {pemCertToDer} = require('./_asn1_utils');
+const {pemCertToDer} = require('../_asn1_utils');
 
 const MAX_RECIPIENT_ADDRESS_SIZE = (2 ** 16) - 1; // 16-bit, unsigned integer
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer

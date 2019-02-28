@@ -7,7 +7,7 @@ const fs = require('fs');
 const yargs = require('yargs');
 const {CARGO_SERIALIZER, PARCEL_SERIALIZER} = require('../core/serialization');
 const {Cargo} = require('../core/messages');
-const {derCertToPem} = require('../core/_asn1_utils');
+const {derCertToPem} = require('../_asn1_utils');
 const {deserializeCargoPayload, deserializeServiceMessage} = require('../core/serialization');
 const {getAddressFromCert} = require('../core/pki');
 
