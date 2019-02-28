@@ -22,7 +22,7 @@ class PoWebSocketClient extends EventEmitter {
      * @param cert
      * @param key
      * @param {null|Array<Object<{cert: string, key: string}>>} oldCerts Certificates that
-     *        are still active are no longer used due to key rotation.
+     *        are still active but are no longer used due to key rotation.
      */
     constructor(wsUrl, cert, key, oldCerts = null) {
         super();
