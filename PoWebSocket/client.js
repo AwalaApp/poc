@@ -158,7 +158,7 @@ class PoWebSocketClient extends EventEmitter {
             try {
                 self._client.send(messageSerialized, (error) => {
                     if (error) {
-                        reject(error)
+                        return reject(error)
                     }
                 });
             } catch (error) {
