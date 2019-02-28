@@ -22,7 +22,11 @@ The [executables in this PoC](bin) match the nodes above: [`twitter-app`](bin/tw
 
 In a production environment, the adapter's endpoint could run independently, perhaps as a reverse proxy or better yet: It could communicate with the adapter through a message broker like [Amazon SQS](https://en.wikipedia.org/wiki/Amazon_Simple_Queue_Service) or [RabbitMQ](https://en.wikipedia.org/wiki/RabbitMQ).
 
-This PoC uses [CoSocket](https://github.com/relaynet/specs/blob/master/rs004-cosocket.md) and [PogRPC](https://github.com/relaynet/specs/blob/master/rs009-pogrpc.md) for cargo relay and parcel delivery, respectively.
+This PoC (mostly) implements the following bindings:
+
+- [CoSocket](https://github.com/relaynet/specs/blob/master/rs004-cosocket.md) for cargo relay.
+- [PoWebSocket](https://github.com/relaynet/specs/blob/master/rs016-powebsocket.md) for the internal _parcel delivery connection_ (PDC) -- That is, the connection between the user gateway and the Twitter app endpoint.
+- [PogRPC](https://github.com/relaynet/specs/blob/master/rs009-pogrpc.md) for the external PDC -- That is, the one between the relaying gateway and the adapter endpoint for the Twitter API.
 
 ## Interactions
 
@@ -39,8 +43,6 @@ The user may perform actions that will result in one or more messages:
 An incoming cargo may contain parcels for different endpoints behind the same gateway. This is what happens with each parcel delivery:
 
 ![](images/twitter-user-parcel-delivery.png)
-
-Note that this PoC uses the [PogRPC binding](https://github.com/relaynet/specs/blob/master/rs009-pogrpc.md), so the Twitter app has to poll for updates (through its endpoint). A binding like [PoSocket](https://github.com/relaynet/specs/blob/master/rs005-posocket.md) allows the gateway to push parcels directly -- It just wouldn't have been necessary here because the Twitter app is a script that has to be run each time it's needed.
 
 ### Relaying cargo between gateways
 
