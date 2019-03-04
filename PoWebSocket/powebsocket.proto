@@ -23,6 +23,10 @@ message EndpointCertificateRequest {
     bytes public_key = 1;
 }
 
+message EndpointCertificateResponse {
+    bytes certificate = 1;
+}
+
 message ParcelDeliveryDeauthorization {
     // https://github.com/relaynet/specs/blob/master/rs002-pki.md#parcel-delivery-deauthorization-pdd
 
