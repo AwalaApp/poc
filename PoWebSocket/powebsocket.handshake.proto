@@ -2,28 +2,21 @@ syntax = "proto3";
 
 package relaynet.powebsocket.handshake;
 
-message Start {
-    // Sent by the endpoint
-
-    repeated bytes endpoint_certificates = 1;
-}
-
-message GatewayResponse {
-    // Sent by the gateway in response to Start
+message Challenge {
+    // Sent by the gateway at the start of the connection
 
     string gateway_nonce = 1;
 }
 
-message EndpointResponse {
-    // Sent by the endpoint in response to GatewayResponse
+message Response {
+    // Sent by the endpoint in response to Challenge
 
-    // The gateway's nonce signed by each endpoint certificate. The key is the endpoint address
-    // for from each cert in the Start message.
-    map<string, bytes> gateway_nonce_signatures = 1;
+    // The gateway's nonce signed by each endpoint certificate.
+    repeated bytes gateway_nonce_signatures = 1;
 }
 
 message Complete {
-    // Sent by the gateway after successfully validating EndpointResponse
+    // Sent by the gateway after successfully validating Response
 
     bool success = 1;
 }

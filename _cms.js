@@ -52,40 +52,49 @@ async function decrypt(ciphertext, keyPath) {
  * @param {string|Buffer} keyPem PEM-encoded private key (or the path to it)
  * @param {Buffer} certPem
  * @param {string} hashAlgorithm
+ * @param {boolean} embedCert Whether to embed the DER-encoded form of `certPem` in the signature.
  * @returns {Promise<Buffer>} The signature (detached)
  */
-async function sign(plaintext, keyPem, certPem, hashAlgorithm) {
+async function sign(plaintext, keyPem, certPem, hashAlgorithm, embedCert = false) {
     const keyPath = (typeof keyPem === 'string') ? keyPem : (await bufferToTmpFile(keyPem)).path;
     const certPemFile = await bufferToTmpFile(certPem);
-    const result = await opensslExec('cms.sign', plaintext, {
+    return await opensslExec('cms.sign', plaintext, {
         binary: true,
         outform: 'DER',
         md: hashAlgorithm,
-        nocerts: true,
+        nocerts: !embedCert,
         signer: certPemFile.path,
         inkey: keyPath,
     });
-    return result
 }
 
 /**
  * @param {Buffer} plaintext
  * @param {Buffer} signature
- * @param {Buffer} certDer
- * @returns {Promise<void>}
+ * @param {Buffer|null} certDer
+ * @returns {Promise<void|Buffer>} The certificate embedded in the signature if `certDer` is absent
  * @throws Error If the signature doesn't match
  */
-async function verifySignature(plaintext, signature, certDer) {
+async function verifySignature(plaintext, signature, certDer = null) {
     const plaintextFile = await bufferToTmpFile(plaintext);
-    const certPemFile = await bufferToTmpFile(derCertToPem(certDer));
-    await opensslExec('cms.verify', signature, {
+    const args = {
         binary: true,
         inform: 'DER',
-        certfile: certPemFile.path,
         noverify: true, // Allow self-signed certs (undocumented!)
-        nointern: true,
         content: plaintextFile.path,
-    });
+    };
+    if (certDer) {
+        args.certfile = (await bufferToTmpFile(derCertToPem(certDer))).path;
+        args.nointern = true;
+    } else {
+        args.signer = (await tmp.file()).path;
+    }
+
+    await opensslExec('cms.verify', signature, args);
+
+    if (args.signer) {
+        return fs.readFileSync(args.signer);
+    }
 }
 
 async function bufferToTmpFile(buffer) {

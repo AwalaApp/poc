@@ -5,13 +5,11 @@ const cms = require('../_cms');
 const protobuf = require('protobufjs');
 const uuid4 = require('uuid4');
 const {getAddressFromCert} = require('../core/pki');
-const {pemCertToDer} = require('../_asn1_utils');
 
 const root = protobuf.loadSync(__dirname + '/powebsocket.handshake.proto');
 
-const Start = root.lookupType('relaynet.powebsocket.handshake.Start');
-const GatewayResponse = root.lookupType('relaynet.powebsocket.handshake.GatewayResponse');
-const EndpointResponse = root.lookupType('relaynet.powebsocket.handshake.EndpointResponse');
+const Challenge = root.lookupType('relaynet.powebsocket.handshake.Challenge');
+const Response = root.lookupType('relaynet.powebsocket.handshake.Response');
 const Complete = root.lookupType('relaynet.powebsocket.handshake.Complete');
 
 /**
@@ -37,9 +35,8 @@ function deserialize(messageSerialized, messageType) {
 }
 
 const STATES = {
-    START: 0,
-    GATEWAY_RESPONSE: 1,
-    ENDPOINT_RESPONSE: 2,
+    CHALLENGE: 1,
+    RESPONSE: 2,
     COMPLETE: 3,
 };
 
@@ -50,7 +47,7 @@ const STATES = {
  */
 function runClientHandshake(connection, endpointCerts) {
     return new Promise(async (resolve, reject) => {
-        let nextState = STATES.GATEWAY_RESPONSE;
+        let nextState = STATES.CHALLENGE;
 
         function sendMessage(message) {
             const messageSerialized = serialize(message);
@@ -71,24 +68,22 @@ function runClientHandshake(connection, endpointCerts) {
 
         async function resumeHandshake(message) {
             switch (nextState) {
-                case STATES.GATEWAY_RESPONSE:
-                    const gwResponse = deserialize(message, GatewayResponse);
-                    const gatewayNonceSignatures = {};
+                case STATES.CHALLENGE:
+                    const challenge = deserialize(message, Challenge);
+                    const gatewayNonceSignatures = [];
                     for (const {cert, key} of endpointCerts) {
-                        const address = getAddressFromCert(cert);
-                        gatewayNonceSignatures[address] = await cms.sign(
-                            Buffer.from(gwResponse.gatewayNonce),
+                        gatewayNonceSignatures.push(await cms.sign(
+                            Buffer.from(challenge.gatewayNonce),
                             key,
                             cert,
                             'sha256',
-                        );
+                            true,
+                        ));
                     }
 
-                    const endpointResponse = EndpointResponse.create({
-                        gatewayNonceSignatures,
-                    });
+                    const response = Response.create({gatewayNonceSignatures});
                     try {
-                        sendMessage(endpointResponse);
+                        sendMessage(response);
                     } catch (error) {
                         reject(error);
                         return;
@@ -116,77 +111,37 @@ function runClientHandshake(connection, endpointCerts) {
         }
 
         connection.on('message', resumeHandshake);
-
-        connection.on('open', async () => {
-            const startMessage = Start.create({
-                endpointCertificates: endpointCerts.map(c => pemCertToDer(c.cert)),
-            });
-            try {
-                await sendMessage(startMessage);
-            } catch (error) {
-                reject(error);
-            }
-        });
     });
 }
 
 function runServerHandshake(connection, postHandshakeCallback) {
-    let nextState = STATES.START;
     const nonce = uuid4();
-    const endpointCertByAddress = {};
 
-    async function processHandshakeMessage(messageSerialized) {
-        switch (nextState) {
-            case STATES.START:
-                const startMessage = deserialize(messageSerialized, Start);
-                for (const endpointCert of startMessage.endpointCertificates) {
-                    const address = getAddressFromCert(endpointCert);
-                    endpointCertByAddress[address] = endpointCert;
-                }
-                const gwResponse = GatewayResponse.create({
-                    gatewayNonce: nonce,
-                });
-                connection.send(serialize(gwResponse));
-                nextState = STATES.ENDPOINT_RESPONSE;
-                break;
-
-            case STATES.ENDPOINT_RESPONSE:
-                const responseMessage = deserialize(messageSerialized, EndpointResponse);
-                for (const [address, signature] of Object.entries(responseMessage.gatewayNonceSignatures)) {
-                    const endpointCert = endpointCertByAddress[address];
-                    if (!endpointCert) {
-                        console.warn(`Invalid EndpointResponse address: ${address}`);
-                        connection.close();
-                        return;
-                    }
-                    try {
-                        await cms.verifySignature(
-                            Buffer.from(nonce),
-                            signature,
-                            endpointCert,
-                        )
-                    } catch (error) {
-                        console.warn(`Invalid EndpointResponse signature for ${address}`);
-                        connection.close();
-                        return;
-                    }
-                }
-
-                const completeMessage = Complete.create({success: true});
-                connection.send(serialize(completeMessage));
-
-                postHandshakeCallback();
-
-                nextState = null;
-                break;
-
-            default:
-                connection.off('message', processHandshakeMessage);
-                break;
+    async function processResponse(messageSerialized) {
+        const responseMessage = deserialize(messageSerialized, Response);
+        for (const signature of responseMessage.gatewayNonceSignatures) {
+            let signerCert;
+            try {
+                signerCert = await cms.verifySignature(Buffer.from(nonce), signature);
+            } catch (error) {
+                console.warn('Invalid nonce signature', error);
+                connection.close();
+                return;
+            }
+            console.log(`[PDC] Endpoint ${getAddressFromCert(signerCert)} connected.`);
         }
+
+        const completeMessage = Complete.create({success: true});
+        connection.send(serialize(completeMessage));
+
+        postHandshakeCallback();
+        connection.off('message', processResponse);
     }
 
-    connection.on('message', processHandshakeMessage);
+    connection.on('message', processResponse);
+
+    const challenge = Challenge.create({gatewayNonce: nonce});
+    connection.send(serialize(challenge));
 }
 
 module.exports = {
