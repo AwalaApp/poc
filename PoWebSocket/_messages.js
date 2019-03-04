@@ -11,12 +11,16 @@ const ParcelDelivery = root.lookupType('relaynet.powebsocket.ParcelDelivery');
 const ParcelDeliveryAck = root.lookupType('relaynet.powebsocket.ParcelDeliveryAck');
 const ParcelCollectionRequest = root.lookupType('relaynet.powebsocket.ParcelCollectionRequest');
 const ParcelDeliveryComplete = root.lookupType('relaynet.powebsocket.ParcelDeliveryComplete');
+const EndpointCertificateRequest = root.lookupType('relaynet.powebsocket.EndpointCertificateRequest');
+const ParcelDeliveryDeauthorization = root.lookupType('relaynet.powebsocket.ParcelDeliveryDeauthorization');
 
 const TYPE_BY_TAG = {
     0: ParcelDelivery,
     1: ParcelDeliveryAck,
     2: ParcelCollectionRequest,
     3: ParcelDeliveryComplete,
+    4: EndpointCertificateRequest,
+    5: ParcelDeliveryDeauthorization,
 };
 const TAG_BY_TYPE = _.invert(TYPE_BY_TAG);
 
@@ -57,4 +61,6 @@ module.exports = {
     ParcelDeliveryAck,
     ParcelCollectionRequest,
     ParcelDeliveryComplete,
+    EndpointCertificateRequest,
+    ParcelDeliveryDeauthorization,
 };
