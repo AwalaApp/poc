@@ -62,7 +62,7 @@ function promptTweetStatus() {
         output: process.stdout,
     });
     return new Promise((resolve) => {
-        rlInterface.question('What would you like to tweet? (optional)\n', (tweetStatus) => {
+        rlInterface.question('What would you like to tweet? (Press ENTER to skip)\n', (tweetStatus) => {
             rlInterface.close();
             resolve(tweetStatus || null);
         });
