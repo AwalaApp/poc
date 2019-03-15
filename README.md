@@ -64,6 +64,8 @@ This is the process for getting timeline updates for each user that subscribes t
 
 ## How to try the PoC
 
+### Setup
+
 First of all, set up your environment:
 
 1. Make sure Node.js v10 and OpenSSL are available in your `$PATH`.
@@ -80,7 +82,10 @@ First of all, set up your environment:
    TWITTER_ACCESS_TOKEN_KEY='<your-access-token-key>'
    TWITTER_ACCESS_TOKEN_SECRET='<your-access-token-secret>'
    ```
-1. Now start the gateways and the Twitter API adapter, preferably in separate terminal sessions so you can see what's happening at all times: `bin/user-gateway`, `bin/relayer-gateway` and `bin/twitter-api-adapter`.
+
+### Running the PoC
+
+You can now start the gateways and the Twitter API adapter by running the script `bin/run-servers` (it will run the three processes in the foreground). Press Ctrl+C to stop them.
 
 At this point you're ready to see Relaynet in action. You can do the following, for example:
 
