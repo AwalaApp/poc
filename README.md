@@ -85,12 +85,14 @@ First of all, set up your environment:
 
 ### Running the PoC
 
-You can now start the gateways and the Twitter API adapter by running `npm start` (it will run the three processes in the foreground). Press Ctrl+C to stop them.
+At this point you're ready to see Relaynet in action.
 
-At this point you're ready to see Relaynet in action. You can do the following, for example:
+First, you need to start the gateways and the Twitter API adapter by running `npm start`, which will run the three processes in the foreground. Keep this running in the foreground so you can see what the three processes are doing.
+
+Next, open a new terminal session and try the following:
 
 1. Run `bin/twitter-app` to post a new tweet. The first time you run this, it will also create a message to subscribe the current app to updates to your home timeline. Subsequent calls will show any new tweets in your home timeline.
-1. Run `bin/relay` to simulate the exchange of cargo between the relayer and the user's gateway. Set the `--cosocket` option to the socket path where `bin/user-gateway` is listening. For example:
+1. Run `bin/relay` to simulate the exchange of cargo between the relayer and the user's gateway. Set the `--cosocket` option to the socket path where `bin/user-gateway` is listening. If you're using Linux, the exact command you need to run is:
 
    ```bash
    bin/relay \
@@ -98,7 +100,7 @@ At this point you're ready to see Relaynet in action. You can do the following, 
        --incoming=/tmp/usb-flashdrive/user-gw \
        --outgoing=/tmp/usb-flashdrive/relayer-gw
    ```
-1. Run `bin/relay` again, but this time to simulate the exchange of cargo between the relayer and their gateway. Make sure to set `--cosocket` to the relayer's gateway's socket path (output when you ran `bin/relayer-gateway`). For example:
+1. Run `bin/relay` again, but this time to simulate the exchange of cargo between the relayer and their gateway. Make sure to set `--cosocket` to the relayer's gateway's socket path (output when you ran `bin/relayer-gateway`). If you're using Linux, the exact command you need to run is:
 
    ```bash
    bin/relay \
