@@ -4,7 +4,7 @@
   "description": "Proof of concept for Relaynet",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "concurrently \"npm:user-gateway\" \"npm:relaying-gateway\" \"npm:twitter-api-adapter\"",
+    "start": "concurrently --kill-others \"npm:user-gateway\" \"npm:relaying-gateway\" \"npm:twitter-api-adapter\"",
     "user-gateway": "bin/user-gateway",
     "relaying-gateway": "bin/relayer-gateway",
     "twitter-api-adapter": "bin/twitter-api-adapter"
