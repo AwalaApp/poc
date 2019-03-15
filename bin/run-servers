@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CURRENT_DIR_PATH="$(dirname "${BASH_SOURCE}"})"
+CURRENT_DIR_PATH="$(dirname "${BASH_SOURCE}")"
 
 # Note this is GNU Parallel, not `parallel` from moreutils
 parallel --line-buffer --tag ::: \
