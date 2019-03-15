@@ -69,7 +69,6 @@ This is the process for getting timeline updates for each user that subscribes t
 First of all, set up your environment:
 
 1. Make sure Node.js v10 and OpenSSL are available in your `$PATH`.
-1. Install GNU Parallel. On Ubuntu, run `sudo apt-get install parallel`.
 1. Run `npm install`.
 1. Map `twitter-3rd-party-endpoint.example.com` to the local loopback (`127.0.0.1`). On Linux this can be done by adding an entry to `/etc/hosts`.
 1. [Register an OAuth app on Twitter](https://apps.twitter.com/).
@@ -86,7 +85,7 @@ First of all, set up your environment:
 
 ### Running the PoC
 
-You can now start the gateways and the Twitter API adapter by running the script `bin/run-servers` (it will run the three processes in the foreground). Press Ctrl+C to stop them.
+You can now start the gateways and the Twitter API adapter by running `npm start` (it will run the three processes in the foreground). Press Ctrl+C to stop them.
 
 At this point you're ready to see Relaynet in action. You can do the following, for example:
 
