@@ -6,6 +6,8 @@ This monorepo implements a proof of concept of Twitter running on [Relaynet](htt
 
 ![](images/tweet.png)
 
+You can also [watch a demo of this PoC on YouTube](https://www.youtube.com/watch?v=fi_RKwmrXIY).
+
 This a [Level 3 integration](https://github.com/relaynet/specs/blob/master/rs012-service-integration.md#level-3-third-party-messaging-adapter) on the [Relaynet Service Integration Scale](https://github.com/relaynet/specs/blob/master/rs012-service-integration.md): That is, a third party is running an adapter on top of the official Twitter API.
 
 The Twitter app in this PoC isn't really a mobile app: It's a CLI.
