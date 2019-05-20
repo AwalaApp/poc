@@ -22,14 +22,10 @@ openssl req \
     -config <(cat <<EOF
 [req]
 distinguished_name = req_distinguished_name
-x509_extensions = SAN
 prompt = no
 
 [req_distinguished_name]
-C = GB
-
-[SAN]
-subjectAltName = URI:${ADDRESS}
+CN = ${ADDRESS}
 EOF
 ) \
     -key "${KEY_PATH}" \

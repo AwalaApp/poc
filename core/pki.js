@@ -15,11 +15,9 @@ function getAddressFromCert(certSerialized) {
     // The production equivalent of this function MUST validate the address.
     const pemCert = isPemCert(certSerialized) ? certSerialized : derCertToPem(certSerialized);
     const cert = certificateFromPem(pemCert);
-    const extension = cert.getExtension('subjectAltName');
-    assert.equal(extension.altNames.length, 1, 'There must be exactly one alt name');
-    const altName = extension.altNames[0];
-    assert.equal(altName.type, 6, 'The alt name must be of type URI');
-    return altName.value;
+    const address = cert.subject.getField('CN').value;
+    assert(address, 'There must be a CN field');
+    return address;
 }
 
 module.exports = {
