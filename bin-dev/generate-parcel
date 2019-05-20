@@ -9,16 +9,26 @@ const {ServiceMessage} = require('../core/messages');
 
 async function main(argv) {
     const messageSerialized = fs.readFileSync(process.stdin.fd);
-    process.stdout.write(await PARCEL_SERIALIZER.serialize(
-        serializeServiceMessage(new ServiceMessage(messageSerialized, argv.type)),
-        argv.recipientCert,
-        fs.readFileSync(argv.senderCert),
-        argv.senderKey,
-        argv.signHashAlgo,
-        argv.id,
-        argv.date && new Date(argv.date * 1000),
-        argv.ttl,
-    ));
+    let parcelSerialized;
+
+    try {
+        parcelSerialized = await PARCEL_SERIALIZER.serialize(
+            serializeServiceMessage(new ServiceMessage(messageSerialized, argv.type)),
+            argv.recipientCert,
+            fs.readFileSync(argv.senderCert),
+            argv.senderKey,
+            argv.signHashAlgo,
+            argv.id,
+            argv.date && new Date(argv.date * 1000),
+            argv.ttl,
+        );
+    } catch (error) {
+        console.error('Uncaught exception when serializing parcel:');
+        console.error(error);
+        return 1;
+    }
+
+    process.stdout.write(parcelSerialized);
 }
 
 const argv = yargs

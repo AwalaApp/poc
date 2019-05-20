@@ -1,31 +1,40 @@
-#!/usr/bin/env bash
-# Generate certificates for a public endpoint or gateway
+#!/usr/bin/env node
+'use strict';
+// This is a proof of concept. The code below is ugly, inefficient and has no tests.
 
-set -o nounset
-set -o errexit
-set -o pipefail
+const fs = require('fs');
+const yargs = require('yargs');
+const asn1Utils = require('../_asn1_utils');
+const pki = require('../core/pki');
+const {getCrypto} = require('pkijs');
 
-ADDRESS="$1"
-CERT_PATH="$2"
-KEY_PATH="$3"
+async function main(argv) {
+    const keyPair = await pki.generateNodeKeyPair('SHA-256');
+    const certificate = await pki.createPublicNodeCertificate(keyPair, argv.address);
+    fs.writeFileSync(argv.cert_path, asn1Utils.derCertToPem(asn1Utils.serializeAsn1jsValue(certificate)));
 
-openssl genrsa -out "${KEY_PATH}" 4096
+    const crypto = getCrypto();
+    const privateKeyDerBuffer = Buffer.from(await crypto.exportKey("pkcs8", keyPair.privateKey));
+    fs.writeFileSync(
+        argv.key_path,
+        asn1Utils.derKeyToPkcs8Pem(privateKeyDerBuffer),
+    );
 
-openssl req \
-    -new \
-    -x509 \
-    -days 365 \
-    -nodes \
-    -config <(cat <<EOF
-[req]
-distinguished_name = req_distinguished_name
-prompt = no
+    console.log(`Generated certificate with address ${argv.address}`)
+}
 
-[req_distinguished_name]
-CN = ${ADDRESS}
-EOF
-) \
-    -key "${KEY_PATH}" \
-    -out "${CERT_PATH}"
+function configureArgs(builder) {
+    builder.normalize(['cert_path', 'key_path']);
+}
 
-echo "Generated certificate for ${ADDRESS}"
+// noinspection BadExpressionStatementJS
+yargs
+    .command( // noinspection JSUnresolvedFunction
+        '$0 address cert_path key_path',
+        'Generate private node cert',
+        configureArgs,
+        main,
+    )
+    .strict()
+    .help()
+    .argv;

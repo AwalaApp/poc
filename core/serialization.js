@@ -8,7 +8,7 @@ const uuid4 = require('uuid4');
 const VError = require('verror');
 const {Cargo, Parcel, ServiceMessage} = require('./messages');
 const {getAddressFromCert} = require('./pki');
-const {pemCertToDer} = require('../_asn1_utils');
+const {pemToDer} = require('../_asn1_utils');
 
 const MAX_RECIPIENT_ADDRESS_SIZE = (2 ** 16) - 1; // 16-bit, unsigned integer
 const MAX_SENDER_CERT_SIZE = (2 ** 13) - 1; // 13-bit, unsigned integer
@@ -82,7 +82,7 @@ class MessageV1Serializer {
     }
 
     static _serializeSenderCert(certPem) {
-        const certDer = pemCertToDer(certPem);
+        const certDer = pemToDer(certPem);
         const certLength = certDer.length;
         if (MAX_SENDER_CERT_SIZE < certLength) {
             throw new Error(`Sender's certificate can't exceed ${MAX_SENDER_CERT_SIZE} octets`);
